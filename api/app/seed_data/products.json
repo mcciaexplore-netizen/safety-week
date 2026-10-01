@@ -1,0 +1,314 @@
+[
+ {
+  "line_order": 1,
+  "sr_no": 1,
+  "name": "Badges",
+  "hsn_code": "49090090",
+  "rate": 4.8,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 2,
+  "sr_no": 2,
+  "name": "Ball Pens",
+  "hsn_code": "96081019",
+  "rate": 20.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 3,
+  "sr_no": null,
+  "name": "Ball Pens (Matt Finish)",
+  "hsn_code": "96081019",
+  "rate": 35.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 4,
+  "sr_no": 3,
+  "name": "Banners - Cloth - English - 6 x 3",
+  "hsn_code": "59119090",
+  "rate": 390.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 5,
+  "sr_no": 4,
+  "name": "Banners - Cloth - Hindi - 6 x 3",
+  "hsn_code": "59119090",
+  "rate": 390.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 6,
+  "sr_no": 5,
+  "name": "Banners - Cloth - Marathi - 6 x 3",
+  "hsn_code": "59119090",
+  "rate": 390.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 7,
+  "sr_no": 6,
+  "name": "Banners - Flex - English -  6x3",
+  "hsn_code": "39209999",
+  "rate": 450.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 8,
+  "sr_no": 7,
+  "name": "Banners - Flex - Hindi -  6x3",
+  "hsn_code": "39209999",
+  "rate": 450.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 9,
+  "sr_no": 8,
+  "name": "Banners - Flex - Marathi -  6x3",
+  "hsn_code": "39209999",
+  "rate": 450.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 10,
+  "sr_no": 9,
+  "name": "Banners - PPE Flex - 5x2",
+  "hsn_code": "39209999",
+  "rate": 430.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 11,
+  "sr_no": 10,
+  "name": "Caps",
+  "hsn_code": "61091000",
+  "rate": 100.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 12,
+  "sr_no": 11,
+  "name": "Coffee Mugs",
+  "hsn_code": "69120010",
+  "rate": 200.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 13,
+  "sr_no": 12,
+  "name": "Danglers - Set of 20",
+  "hsn_code": "49119920",
+  "rate": 170.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 14,
+  "sr_no": 13,
+  "name": "Flags - Normal",
+  "hsn_code": "61091000",
+  "rate": 375.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 15,
+  "sr_no": 14,
+  "name": "Flags - Handy",
+  "hsn_code": "61091000",
+  "rate": 75.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 16,
+  "sr_no": 15,
+  "name": "Oath English  Flex",
+  "hsn_code": "39209999",
+  "rate": 270.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 17,
+  "sr_no": 16,
+  "name": "Oath Hindi  Flex",
+  "hsn_code": "39209999",
+  "rate": 270.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 18,
+  "sr_no": 17,
+  "name": "Oath Marathi  Flex",
+  "hsn_code": "39209999",
+  "rate": 270.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 19,
+  "sr_no": 18,
+  "name": "Pocket Books - Mr. Bulakh",
+  "hsn_code": "49090090",
+  "rate": 65.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 20,
+  "sr_no": 19,
+  "name": "Pocket Guide (Set of 25 Nos.)",
+  "hsn_code": "49090090",
+  "rate": 375.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 21,
+  "sr_no": 20,
+  "name": "Pocket Calendars - Set of 40",
+  "hsn_code": "49100090",
+  "rate": 340.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 22,
+  "sr_no": 21,
+  "name": "Posters Safety",
+  "hsn_code": "49119920",
+  "rate": 130.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 23,
+  "sr_no": 22,
+  "name": "Posters 5-S",
+  "hsn_code": "49119920",
+  "rate": 130.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 24,
+  "sr_no": 23,
+  "name": "Scrolls - Do's & Don’ts - English Set of 2",
+  "hsn_code": "39209999",
+  "rate": 670.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 25,
+  "sr_no": 24,
+  "name": "Scrolls - Do's & Don’ts - Marathi Set of 2",
+  "hsn_code": "39209999",
+  "rate": 670.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 26,
+  "sr_no": 25,
+  "name": "PPE Scrolls Safety - English",
+  "hsn_code": "39209999",
+  "rate": 370.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 27,
+  "sr_no": 26,
+  "name": "PPE Scrolls Safety - Marathi",
+  "hsn_code": "39209999",
+  "rate": 370.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 28,
+  "sr_no": 27,
+  "name": "Scrolls Security - Marathi",
+  "hsn_code": "39209999",
+  "rate": 370.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 29,
+  "sr_no": 28,
+  "name": "Slogans - 7.5 x 20",
+  "hsn_code": "49119920",
+  "rate": 70.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 30,
+  "sr_no": 29,
+  "name": "Slogans - 10 x 15",
+  "hsn_code": "49119920",
+  "rate": 80.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 31,
+  "sr_no": 30,
+  "name": "Slogans - 15 x 20",
+  "hsn_code": "49119920",
+  "rate": 90.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 32,
+  "sr_no": 31,
+  "name": "Stickers for Vehicles - Set of 30",
+  "hsn_code": "49119920",
+  "rate": 150.0,
+  "gst_half_rate": 9.0
+ },
+ {
+  "line_order": 33,
+  "sr_no": 32,
+  "name": "T-Shirts - L",
+  "hsn_code": "61091000",
+  "rate": 340.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 34,
+  "sr_no": 33,
+  "name": "T Shirts - XL",
+  "hsn_code": "61091000",
+  "rate": 340.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 35,
+  "sr_no": 34,
+  "name": "T Shirts - XXL",
+  "hsn_code": "61091000",
+  "rate": 340.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 36,
+  "sr_no": null,
+  "name": "T-Shirts - L (Premium Quality)",
+  "hsn_code": "61091000",
+  "rate": 450.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 37,
+  "sr_no": null,
+  "name": "T Shirts - XL (Premium Quality)",
+  "hsn_code": "61091000",
+  "rate": 450.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 38,
+  "sr_no": null,
+  "name": "T Shirts - XXL (Premium Quality)",
+  "hsn_code": "61091000",
+  "rate": 450.0,
+  "gst_half_rate": 2.5
+ },
+ {
+  "line_order": 39,
+  "sr_no": 35,
+  "name": "Water Bottle",
+  "hsn_code": "96170090",
+  "rate": 400.0,
+  "gst_half_rate": 9.0
+ }
+]

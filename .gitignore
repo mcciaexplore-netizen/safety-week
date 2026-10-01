@@ -1,0 +1,12 @@
+api/.venv/
+api/.pgdata/
+api/.env
+__pycache__/
+.pytest_cache/
+node_modules/
+.next/
+test-results/
+api/storage/
+.next-test/
+.env.local
+.env*.local
