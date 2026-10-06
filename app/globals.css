@@ -152,6 +152,16 @@
     top: 0;
     width: 100%;
   }
+  /* the preview dialog is a fixed, scrolling box on screen; on paper it must flow like a normal page */
+  [data-slot="dialog-content"] {
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+  }
+  [data-slot="dialog-content"] * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
   .paper-frame {
     height: auto !important;
     overflow: visible !important;

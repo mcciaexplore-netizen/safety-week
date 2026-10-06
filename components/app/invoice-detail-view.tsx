@@ -59,7 +59,7 @@ export function InvoiceDetailView({ id }: { id: string }) {
         <>
           <div className="print:hidden">
             <PageHeader
-              eyebrow="Pro Forma Invoice"
+              eyebrow="Proforma Invoice"
               title={inv.invoiceNumber}
               description={`${inv.customer.companyName} · version ${inv.version}`}
               actions={

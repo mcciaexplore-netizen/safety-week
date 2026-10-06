@@ -1,7 +1,7 @@
 """Authentication + the trust boundary.
 
 The ONLY inputs trusted for "who is this and which branch are they in" are:
-  1. a Supabase-signed JWT (signature, expiry and audience verified here), and
+  1. a JWT signed by this API at sign-in (signature, expiry and audience verified here), and
   2. the caller's row in our own `users` table, found by the JWT `sub`.
 Anything in a request body, query string or header about branch/role is ignored or rejected.
 """
@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jwt import PyJWKClient
 from sqlalchemy import select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
@@ -22,7 +21,6 @@ from .db import get_session
 from .models import User
 
 _bearer = HTTPBearer(auto_error=False)
-_jwks: PyJWKClient | None = None
 
 
 @dataclass(frozen=True)
@@ -47,21 +45,13 @@ def _unauthorized(detail: str = "Invalid or expired credentials") -> HTTPExcepti
 
 
 def verify_token(token: str) -> dict:
-    """Return verified claims or raise 401. The algorithm list is fixed server-side (no 'none')."""
-    global _jwks
+    """Return verified claims or raise 401. The algorithm is fixed server-side (no 'none', no switching)."""
+    if not settings.jwt_secret:
+        raise _unauthorized()
     try:
-        alg = jwt.get_unverified_header(token).get("alg")
-        if alg == "HS256" and settings.supabase_jwt_secret:
-            key, algs = settings.supabase_jwt_secret, ["HS256"]
-        elif alg in ("ES256", "RS256") and settings.supabase_url:
-            _jwks = _jwks or PyJWKClient(f"{settings.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json")
-            key, algs = _jwks.get_signing_key_from_jwt(token).key, [alg]
-        else:
-            raise _unauthorized()
-        return jwt.decode(
-            token, key, algorithms=algs, audience="authenticated", options={"require": ["exp", "sub"]}
-        )
-    except (jwt.PyJWTError, jwt.PyJWKClientError):
+        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], audience="authenticated",
+                          options={"require": ["exp", "sub"]})
+    except jwt.PyJWTError:
         raise _unauthorized() from None
 
 

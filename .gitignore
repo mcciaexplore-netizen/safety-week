@@ -10,3 +10,5 @@ api/storage/
 .next-test/
 .env.local
 .env*.local
+.vercel
+.env*

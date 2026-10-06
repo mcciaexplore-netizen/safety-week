@@ -113,7 +113,7 @@ def invoice_sheet(wb: Workbook, inv: Invoice, products: list[Product], header: d
         hsn = item.hsn_code if item else prod.hsn_code
         rate = item.rate if item else prod.current_rate
         gst = (item.cgst_rate if item else prod.cgst_rate)
-        vals = [prod.sr_no if prod else None, name, hsn, rate, item.quantity if item else None]
+        vals = [sr, name, hsn, rate, item.quantity if item else None]
         if disc:
             vals.append(item.rate_after_discount if item else rate - rate * inv.discount_percent / 100)
         vals += [item.basic_amount if item else 0, gst / 100, item.cgst_amount if item else 0, gst / 100,
@@ -166,7 +166,7 @@ def invoice_sheet(wb: Workbook, inv: Invoice, products: list[Product], header: d
 def summary_sheet(wb: Workbook, invoices: list[Invoice], day: date, scope: str, codes: dict) -> None:
     ws = wb.active
     ws.title = "Summary"
-    ws["A1"] = f"Pro Forma Invoices - {day.strftime('%d/%b/%Y')} - {scope}"
+    ws["A1"] = f"Proforma Invoices - {day.strftime('%d/%b/%Y')} - {scope}"
     ws["A1"].font = Font(name="Calibri", bold=True, size=13)
     head = ["Branch", "Invoice No.", "Company", "Status", "Payment", "Items qty", "Amount (Rs.)"]
     for i, h in enumerate(head, 1):

@@ -14,11 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "National Safety Week 2027 — MCCIA Pro Forma Invoices",
+    default: "National Safety Week 2027 — MCCIA Proforma Invoices",
     template: "%s · MCCIA Safety Week 2027",
   },
   description:
-    "Pro Forma Invoice system for MCCIA National Safety Week 2027 safety-awareness material sales.",
+    "Proforma Invoice system for MCCIA National Safety Week 2027 safety-awareness material sales.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

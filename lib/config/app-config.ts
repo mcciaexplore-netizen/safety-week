@@ -73,4 +73,4 @@ export const LABELS = {
   signatory: "Authorized Signatory",
 } as const;
 
-export const APP_NAME = "MCCIA Safety Week Pro Forma";
+export const APP_NAME = "MCCIA Safety Week Proforma";

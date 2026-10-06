@@ -12,7 +12,7 @@ import type {
 
 /**
  * Service boundaries. The UI depends ONLY on these interfaces; the mock
- * implementations in ./mock can be swapped for FastAPI/Supabase clients.
+ * implementations in ./mock can be swapped for FastAPI clients.
  *
  * No invoice method accepts a branch id. The branch is resolved from the
  * authenticated identity (PLAN §26.11): in the mock it comes from the mock
@@ -37,7 +37,7 @@ export interface Session {
   user: SessionUser;
   branch: Branch;
   signedInAt: string;
-  /** Supabase access token (real auth only). Phase 6 sends it as the API bearer token. */
+  /** API access token (real auth only). Phase 6 sends it as the API bearer token. */
   accessToken?: string;
 }
 

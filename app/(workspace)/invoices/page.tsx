@@ -50,7 +50,7 @@ export default function InvoicesPage() {
         actions={
           <Link href="/invoices/new" className={buttonVariants()}>
             <FilePlus2 data-icon="inline-start" />
-            New Pro Forma
+            New Proforma
           </Link>
         }
       />
@@ -94,7 +94,7 @@ export default function InvoicesPage() {
           description={
             filtered
               ? "Try a different invoice ID, customer name, status or date range."
-              : "Create the first Pro Forma Invoice for this branch."
+              : "Create the first Proforma Invoice for this branch."
           }
           action={
             filtered ? (
@@ -111,7 +111,7 @@ export default function InvoicesPage() {
               </Button>
             ) : (
               <Link href="/invoices/new" className={buttonVariants()}>
-                New Pro Forma
+                New Proforma
               </Link>
             )
           }

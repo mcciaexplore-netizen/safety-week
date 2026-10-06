@@ -14,8 +14,8 @@ test("sidebar: open normally, collapsed automatically on the invoice form, colla
   await signIn(page);
   await expect(sidebar(page)).toHaveAttribute("data-collapsed", "0");
 
-  // opening a New Pro Forma collapses it by itself, so the invoice gets the room
-  await page.getByRole("link", { name: "New Pro Forma" }).first().click();
+  // opening a New Proforma collapses it by itself, so the invoice gets the room
+  await page.getByRole("link", { name: "New Proforma" }).first().click();
   await expect(page).toHaveURL(/invoices\/new/);
   await expect(sidebar(page)).toHaveAttribute("data-collapsed", "1");
   await expect.poll(async () => (await sidebar(page).boundingBox())!.width).toBeLessThan(80); // after the slide animation

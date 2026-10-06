@@ -15,7 +15,7 @@ export function PublicHeader() {
         <Link href="/" className="flex items-center gap-3" aria-label="MCCIA Safety Week home">
           <MCCIALogo height={28} />
           <span className="hidden border-l pl-3 text-sm font-medium text-muted-foreground sm:block">
-            Safety Week Pro Forma
+            Safety Week Proforma
           </span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">

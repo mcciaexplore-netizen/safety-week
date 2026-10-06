@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const FEATURES = [
   {
     icon: FileText,
-    title: "Editable Pro Forma Invoice",
+    title: "Editable Proforma Invoice",
     text: "Fill the MCCIA invoice in the browser with items, HSN, CGST/SGST and totals calculated for you.",
   },
   {
@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: "Built for MCCIA processes",
-    text: "Layout, wording and field names follow the existing Pro Forma Invoice format.",
+    text: "Layout, wording and field names follow the existing Proforma Invoice format.",
   },
 ];
 
@@ -40,11 +40,11 @@ export default function LandingPage() {
             <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
               National Safety Week {EVENT.year}
               <span className="block text-2xl font-normal text-sidebar-foreground/80 sm:text-3xl">
-                Pro Forma Invoice System
+                Proforma Invoice System
               </span>
             </h1>
             <p className="max-w-xl text-base text-sidebar-foreground/80">
-              Create, review and track Pro Forma Invoices for safety-awareness material sales across all
+              Create, review and track Proforma Invoices for safety-awareness material sales across all
               five MCCIA branches.
             </p>
             <div className="flex flex-wrap gap-3">

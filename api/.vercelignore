@@ -1,0 +1,12 @@
+.venv
+.pgdata
+.env
+storage
+tests
+__pycache__
+*.pyc
+migrations
+alembic.ini
+start_dev.py
+start-dev.bat
+requirements-dev.txt

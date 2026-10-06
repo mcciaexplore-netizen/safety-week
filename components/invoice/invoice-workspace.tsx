@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileEdit, Loader2, Printer, RotateCcw, Save, Send } from "lucide-react";
+import { CheckCircle2, Eye, Loader2, Printer, RotateCcw, Save, Send } from "lucide-react";
 import { DownloadButton } from "@/components/app/download-button";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import type { Invoice, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InvoiceForm } from "./invoice-form";
 import { InvoicePaper, PaperFrame } from "./invoice-paper";
+import { MaterialsTable } from "./materials-table";
 
 export function InvoiceWorkspace({
   initialDraft,
@@ -45,8 +46,8 @@ export function InvoiceWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<Invoice | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
-  // The right side is the editable order sheet; the read-only preview appears only after Save Draft / Submit.
-  const [mode, setMode] = useState<"edit" | "preview">("edit");
+  // The proforma preview: opened by the floating button ("view"), or by Submit as the final check ("submit").
+  const [preview, setPreview] = useState<"view" | "submit" | null>(null);
 
   const view = useMemo(() => computeView(draft), [draft]);
   const errors = useMemo(() => (attempted ? validateDraft(draft, attempted) : {}), [draft, attempted]);
@@ -93,7 +94,6 @@ export function InvoiceWorkspace({
       setSaved(next);
       setAttempted(null);
       if (!draft.id) window.history.replaceState(null, "", `/invoices/${inv.id}/edit`);
-      setMode("preview"); // saved: now show the finished invoice
       if (action === "submit") setSubmitted(inv);
       else setNotice(`Draft saved at ${formatDateTime(inv.updatedAt)}`);
     } catch (e) {
@@ -101,7 +101,17 @@ export function InvoiceWorkspace({
       setServerError(e instanceof Error ? e.message : "Could not save the invoice.");
     } finally {
       setSaving(null);
+      setPreview(null);
     }
+  }
+
+  /** Submit first shows the exact proforma; the invoice is only saved once the user confirms it. */
+  function requestSubmit() {
+    setServerError(null);
+    setNotice(null);
+    setAttempted("submit");
+    if (Object.keys(validateDraft(draft, "submit")).length > 0) return;
+    setPreview("submit");
   }
 
   function reset() {
@@ -112,7 +122,7 @@ export function InvoiceWorkspace({
     setResetOpen(false);
   }
 
-  const title = draft.id ? "Edit Pro Forma Invoice" : "New Pro Forma Invoice";
+  const title = draft.id ? "Edit Proforma Invoice" : "New Proforma Invoice";
   const submitLabel = draftLike ? "Submit" : "Save revision";
 
   return (
@@ -122,7 +132,7 @@ export function InvoiceWorkspace({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 space-y-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h1>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
               {draft.status && <StatusBadge status={draft.status} />}
               {draft.id && <span className="text-xs text-muted-foreground">v{draft.version}</span>}
             </div>
@@ -147,9 +157,9 @@ export function InvoiceWorkspace({
               <RotateCcw data-icon="inline-start" />
               Reset
             </Button>
-            <Button type="button" variant="outline" onClick={() => window.print()}>
-              <Printer data-icon="inline-start" />
-              Print preview
+            <Button type="button" variant="outline" onClick={() => setPreview("view")}>
+              <Eye data-icon="inline-start" />
+              Preview
             </Button>
             {draftLike && (
               <Button
@@ -166,7 +176,7 @@ export function InvoiceWorkspace({
                 Save Draft
               </Button>
             )}
-            <Button type="button" onClick={() => save("submit")} disabled={!!saving || cancelled}>
+            <Button type="button" onClick={requestSubmit} disabled={!!saving || cancelled}>
               {saving === "submit" ? (
                 <Loader2 className="animate-spin" data-icon="inline-start" />
               ) : (
@@ -186,52 +196,88 @@ export function InvoiceWorkspace({
         )}
       </div>
 
-      {/* One column, top to bottom: customer + invoice details, the invoice sheet, then the summary. */}
-      <div className="space-y-6">
-        <div className="mx-auto max-w-5xl print:hidden">
-          <InvoiceForm draft={draft} view={view} errors={errors} update={update} disabled={cancelled} part="details" />
+      {/* One column, top to bottom: customer, materials, invoice information, then the summary. The proforma itself is the preview. */}
+      <div className="space-y-6 pb-20">
+        <div className="mx-auto max-w-7xl print:hidden">
+          <InvoiceForm draft={draft} view={view} errors={errors} update={update} disabled={cancelled} part="customer" />
         </div>
 
-        <div className="min-w-0 print:block">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-3 print:hidden">
-            {mode === "edit" ? (
-              <p className="text-sm">
-                <span className="font-medium">Invoice</span>{" "}
-                <span className="text-muted-foreground">
-                  — click a <strong>Qty.</strong> cell and type a number; amounts fill in automatically. Rows left empty stay on the invoice as a reminder.
-                </span>
-              </p>
-            ) : (
-              <p className="text-sm font-medium" data-testid="preview-title">Saved invoice preview</p>
-            )}
-            {mode === "preview" && !cancelled && (
-              <Button variant="outline" size="sm" onClick={() => setMode("edit")} data-testid="edit-quantities">
-                <FileEdit data-icon="inline-start" />
-                Edit quantities
-              </Button>
-            )}
-          </div>
-          {errors["items"] && mode === "edit" && (
-            <p role="alert" data-testid="error-items" className="mb-2 text-sm text-destructive print:hidden">
-              {errors["items"]}
-            </p>
-          )}
-          <div className="print-area rounded-md bg-neutral-200 p-2 sm:p-4 print:bg-transparent print:p-0">
-            <PaperFrame maxScale={1.35}>
-              <InvoicePaper
-                view={view}
-                products={products}
-                showFullCatalogue
-                editable={mode === "edit" && !cancelled ? { onQty: setQty, canEditRate, onRate: setRate } : undefined}
-              />
-            </PaperFrame>
-          </div>
+        <div className="mx-auto max-w-7xl print:hidden">
+          <fieldset disabled={cancelled} className="min-w-0 disabled:opacity-70">
+            <MaterialsTable
+              products={products}
+              view={view}
+              error={errors["items"]}
+              canEditRate={canEditRate}
+              onQty={setQty}
+              onRate={setRate}
+            />
+          </fieldset>
         </div>
 
-        <div className="mx-auto max-w-5xl print:hidden">
+        <div className="mx-auto max-w-7xl print:hidden">
+          <InvoiceForm draft={draft} view={view} errors={errors} update={update} disabled={cancelled} part="info" />
+        </div>
+
+        <div className="mx-auto max-w-7xl print:hidden">
           <InvoiceForm draft={draft} view={view} errors={errors} update={update} disabled={cancelled} part="summary" />
         </div>
       </div>
+
+      {/* Floating preview button: always one tap away while filling in the form */}
+      <Button
+        type="button"
+        size="lg"
+        onClick={() => setPreview("view")}
+        data-testid="floating-preview"
+        className="fixed right-5 bottom-5 z-30 h-11 rounded-full px-5 shadow-lg print:hidden"
+      >
+        <Eye data-icon="inline-start" />
+        Preview invoice
+        {view.lines.length > 0 && <span className="tabular-nums opacity-90">· {formatRupees(view.totals.roundedTotal)}</span>}
+      </Button>
+
+      {/* Proforma preview (exactly what is printed / saved as the PDF) */}
+      <Dialog open={preview !== null} onOpenChange={(o) => !o && !saving && setPreview(null)}>
+        <DialogContent className="grid-rows-[auto_minmax(0,1fr)_auto] max-h-[94vh] sm:max-w-5xl" data-testid="preview-dialog">
+          <DialogHeader>
+            <DialogTitle data-testid="preview-title">
+              {preview === "submit" ? "Check the proforma invoice, then confirm" : "Proforma invoice preview"}
+            </DialogTitle>
+            <DialogDescription>
+              {preview === "submit"
+                ? `This is exactly what will be submitted${draftLike ? "" : " as a new version"}.`
+                : "A live view of the invoice as filled in so far. Nothing is saved by looking at it."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto rounded-md bg-neutral-200 p-2 sm:p-4">
+            <div className="print-area">
+              <PaperFrame maxScale={1.35}>
+                <InvoicePaper view={view} products={products} showFullCatalogue />
+              </PaperFrame>
+            </div>
+          </div>
+          <DialogFooter>
+            {preview === "submit" ? (
+              <>
+                <DialogClose render={<Button variant="outline" disabled={!!saving} />}>Back to editing</DialogClose>
+                <Button onClick={() => save("submit")} disabled={!!saving} data-testid="confirm-submit">
+                  {saving === "submit" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Send data-icon="inline-start" />}
+                  Confirm &amp; {submitLabel.toLowerCase()}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => window.print()}>
+                  <Printer data-icon="inline-start" />
+                  Print
+                </Button>
+                <DialogClose render={<Button />}>Close</DialogClose>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reset confirmation */}
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
@@ -256,7 +302,7 @@ export function InvoiceWorkspace({
 
       {/* Submit success */}
       <Dialog open={!!submitted} onOpenChange={(o) => !o && setSubmitted(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="size-5 text-emerald-600" />
@@ -268,12 +314,12 @@ export function InvoiceWorkspace({
               {submitted && formatRupees(submitted.totals.roundedTotal)}.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex-wrap sm:justify-end">
             <Link href="/invoices" className={buttonVariants({ variant: "outline" })}>
               Invoice history
             </Link>
             <Link href="/invoices/new" className={buttonVariants({ variant: "outline" })}>
-              New Pro Forma
+              New Proforma
             </Link>
             {submitted && <DownloadButton invoice={submitted} label="Download PDF" />}
             <Link href={submitted ? `/invoices/${submitted.id}` : "/invoices"} className={buttonVariants()}>

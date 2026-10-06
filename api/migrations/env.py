@@ -23,7 +23,7 @@ from app.models import Base
 
 target_metadata = Base.metadata
 if not config.get_main_option('sqlalchemy.url'):
-    config.set_main_option('sqlalchemy.url', settings.database_url.replace('%', '%%'))
+    config.set_main_option('sqlalchemy.url', (settings.database_url_direct or settings.database_url).replace('%', '%%'))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .config import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+# prepare_threshold=None: no server-side prepared statements, so the same code works behind Neon's
+# connection pooler (pgbouncer, transaction mode). pool_recycle: Neon closes idle connections.
+engine = create_engine(settings.database_url, pool_pre_ping=True, pool_recycle=300, pool_size=3, max_overflow=4, connect_args={"prepare_threshold": None})
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 

@@ -13,6 +13,7 @@ const GROUPS = [
   ["invoice.", "Invoices"],
   ["auth.", "Sign-ins"],
   ["user.", "Users and roles"],
+  ["stock.", "Stock and transfers"],
   ["product.", "Products and prices"],
   ["event.", "Event settings"],
   ["discount_rule.", "Discount rules"],
@@ -29,6 +30,7 @@ function details(m: Record<string, unknown>): string {
       parts.push(`${k}: ${JSON.stringify(v.old)} → ${JSON.stringify(v.new)}`);
   }
   if (m.new && typeof m.new === "object") parts.push(String((m.new as Record<string, unknown>).name ?? "created"));
+  if (m.from_branch && m.to_branch) parts.push(`${m.quantity} × ${m.product}: ${m.from_branch} → ${m.to_branch}${m.note ? ` (${m.note})` : ""}`);
   if (m.role) parts.push(`role ${m.role}`);
   return parts.join(" · ") || "—";
 }

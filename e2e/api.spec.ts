@@ -14,6 +14,16 @@ async function signIn(page: Page, code: string) {
   await expect(page).toHaveURL(/dashboard/);
 }
 
+/** Runs checks against the proforma shown by the floating Preview button, then closes it again. */
+async function inPreview(page: Page, check: () => Promise<void>) {
+  await page.getByTestId("floating-preview").click();
+  await expect(page.getByTestId("preview-dialog")).toBeVisible();
+  await check();
+  await page.getByTestId("preview-dialog").getByRole("button", { name: "Close", exact: true }).first().click();
+  await expect(page.getByTestId("preview-dialog")).toHaveCount(0);
+}
+const confirmSubmit = (page: Page) => page.getByTestId("confirm-submit").click();
+
 test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-branch login refused", async ({ page, browser }) => {
   const name = `E2E Real Co ${Date.now()}`;
   await signIn(page, "TIL");
@@ -21,20 +31,22 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
 
   // create a draft; the server (not the browser) assigns the number
   await page.goto("/invoices/new");
-  await expect(page.getByTestId("paper-invoice-no")).toHaveText(/^NSW27-TIL-\d{6}$/);
+  await inPreview(page, () => expect(page.getByTestId("paper-invoice-no")).toHaveText(/^NSW27-TIL-\d{6}$/));
   await company(page).fill(name);
   await page.getByLabel("Proforma Invoice Date").fill("2027-02-12");
   const matt = page.getByLabel("Quantity for Ball Pens (Matt Finish)", { exact: true });
   await expect(page.getByTestId("qty-input")).toHaveCount(39); // the whole catalogue is on the sheet
   await matt.fill("3");
-  await expect(page.getByTestId("paper-grand-total")).toHaveText("123.90");
+  await expect(page.getByTestId("form-grand-total")).toHaveText("123.90");
   await expect(page.getByLabel(/^Rate for /)).toHaveCount(0); // branch users cannot change rates (no rate inputs)
   await page.getByLabel("Mode of payment").selectOption("UPI");        // full amount, taken automatically
   await page.getByLabel("Payment reference").fill("UTR 604794369987");
   await page.getByRole("button", { name: /Save Draft/ }).click();
   await expect(page.getByTestId("save-state")).toContainText("Draft saved");
   await expect(page).toHaveURL(/\/invoices\/[0-9a-f-]{36}\/edit/); // UUID primary key in the URL
+  await page.getByTestId("floating-preview").click();
   const number = (await page.getByTestId("paper-invoice-no").innerText()).trim();
+  await page.getByTestId("preview-dialog").getByRole("button", { name: "Close", exact: true }).first().click();
   expect(number).toMatch(/^NSW27-TIL-\d{6}$/);
 
   // reopen from a fresh page load: everything comes back from the database
@@ -42,8 +54,10 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await expect(company(page)).toHaveValue(name);
   await expect(matt).toHaveValue("3");
   await expect(page.getByLabel("Mode of payment")).toHaveValue("UPI");   // the payment came back from the database
-  await expect(page.getByTestId("paper-payment")).toContainText("UPI Rs. 124.00 (UTR 604794369987)");
-  await expect(page.getByTestId("paper-grand-total")).toHaveText("123.90");
+  await inPreview(page, async () => {
+    await expect(page.getByTestId("paper-payment")).toContainText("UPI Rs. 124.00 (UTR 604794369987)");
+    await expect(page.getByTestId("paper-grand-total")).toHaveText("123.90");
+  });
 
   // history: search by id fragment and by company, status filter
   await page.goto("/invoices");
@@ -59,6 +73,7 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   // submit -> success; the server recalculated (total unchanged) and status is Submitted
   await page.getByRole("link", { name: `Edit ${number}` }).click();
   await page.getByRole("button", { name: "Submit", exact: true }).click();
+  await confirmSubmit(page);
   await expect(page.getByText("Invoice submitted")).toBeVisible();
   // the success dialog offers the PDF: a real, stored PDF comes back
   const [pdf] = await Promise.all([
@@ -78,6 +93,7 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await expect(page.getByTestId("error-editReason")).toHaveText("Give a reason for the change"); // no reason, no revision
   await page.getByLabel("Reason for this change").fill("customer raised the quantity");
   await page.getByRole("button", { name: "Save revision" }).click();
+  await confirmSubmit(page);
   await expect(page.getByText("Revision saved")).toBeVisible();
   await page.goto("/invoices");
   await page.getByLabel("Search invoices").fill(number);

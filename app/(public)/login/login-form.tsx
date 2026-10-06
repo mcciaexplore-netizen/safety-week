@@ -54,7 +54,7 @@ export function LoginForm({ branchCode }: { branchCode: string }) {
           {found ? `${found.name} branch sign-in` : "Branch sign-in"}
         </h1>
         <p className="text-muted-foreground">
-          Sign in to prepare and track Pro Forma Invoices for National Safety Week 2027. Your workspace
+          Sign in to prepare and track Proforma Invoices for National Safety Week 2027. Your workspace
           only shows invoices that belong to your branch.
         </p>
         {!REAL_AUTH && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">

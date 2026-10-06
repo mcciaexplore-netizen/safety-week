@@ -43,7 +43,7 @@ export default function DashboardPage() {
             </Link>
             <Link href="/invoices/new" className={buttonVariants()}>
               <FilePlus2 data-icon="inline-start" />
-              New Pro Forma
+              New Proforma
             </Link>
           </>
         }

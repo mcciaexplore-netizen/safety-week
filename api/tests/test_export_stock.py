@@ -173,3 +173,55 @@ def test_stock_permissions_and_isolation(client, people, prods):
     with engine.connect() as c:
         n = c.execute(text("select count(*) from audit_logs where entity_type = 'stock'")).scalar()
     assert n >= 2
+
+
+# ---------------------------------------------------------------- transfers (central admin only)
+def test_central_admin_sees_all_branches_and_transfers_stock(client, people, prods):
+    adm = people["super"]["h"]
+    badges = prods["Badges"]
+    levels = lambda code: {i["name"]: i for i in client.get(f"{API}/stock", headers=adm, params={"branch": code}).json()["items"]}
+    s0, h0 = levels("SBR")["Badges"]["sold"], levels("HAD")["Badges"]["sold"]
+    assert put_stock(client, adm, [{"product_id": badges, "opening_qty": s0 + 50, "low_threshold": 5}], branch="SBR").status_code == 200
+    assert put_stock(client, adm, [{"product_id": badges, "opening_qty": h0 + 3, "low_threshold": 5}], branch="HAD").status_code == 200
+
+    ov = client.get(f"{API}/stock/overview", headers=adm).json()
+    assert {b["code"] for b in ov["branches"]} >= {"SBR", "HAD"}
+    row = next(i for i in ov["items"] if i["name"] == "Badges")
+    assert row["branches"]["SBR"]["remaining"] == 50 and row["branches"]["HAD"]["remaining"] == 3
+
+    body = {"product_id": badges, "from_branch": "SBR", "to_branch": "HAD", "quantity": 20, "note": "HAD running out"}
+    r = client.post(f"{API}/stock/transfers", json=body, headers=adm)
+    assert r.status_code == 201 and r.json()["from_branch"] and r.json()["quantity"] == 20
+    assert (levels("SBR")["Badges"]["remaining"], levels("SBR")["Badges"]["transferred_out"]) == (30, 20)
+    assert (levels("HAD")["Badges"]["remaining"], levels("HAD")["Badges"]["transferred_in"]) == (23, 20)
+    assert client.get(f"{API}/stock/transfers", headers=adm).json()[0]["note"] == "HAD running out"
+
+    # cannot send more than the sender has, to itself, or to a branch that doesn't exist
+    assert client.post(f"{API}/stock/transfers", json={**body, "quantity": 31}, headers=adm).status_code == 422
+    assert client.post(f"{API}/stock/transfers", json={**body, "to_branch": "SBR"}, headers=adm).status_code == 422
+    assert client.post(f"{API}/stock/transfers", json={**body, "to_branch": "XXX"}, headers=adm).status_code == 422
+    assert client.post(f"{API}/stock/transfers", json={**body, "quantity": 0}, headers=adm).status_code == 422
+    # a branch that had nothing set can receive stock
+    r = client.post(f"{API}/stock/transfers", json={**body, "to_branch": "AHL", "quantity": 5}, headers=adm)
+    assert r.status_code == 201 and levels("AHL")["Badges"]["remaining"] == 5
+
+    # nobody but the central admin can see the overview or move stock
+    for who in ("til", "til_admin"):
+        h = people[who]["h"]
+        assert client.get(f"{API}/stock/overview", headers=h).status_code == 403
+        assert client.get(f"{API}/stock/transfers", headers=h).status_code == 403
+        assert client.post(f"{API}/stock/transfers", json=body, headers=h).status_code == 403
+    assert client.post(f"{API}/stock/transfers", json=body).status_code == 401
+    # a receiving branch sees its new remaining stock; the database refuses writes from a branch admin
+    til_admin = people["til_admin"]
+    with engine.connect() as c:
+        c.execute(text("select set_config('app.user_id', :u, true), set_config('app.role', 'BRANCH_ADMIN', true), set_config('app.branch_id', "
+                       "(select id::text from branches where code = 'TIL'), true)"), {"u": str(til_admin["user_id"])})
+        c.execute(text("set local role app_authenticated"))
+        with pytest.raises(Exception):
+            c.execute(text("insert into stock_transfers (event_id, product_id, from_branch_id, to_branch_id, quantity) "
+                           "values ((select id from events limit 1), :p, (select id from branches where code='TIL'), "
+                           "(select id from branches where code='SBR'), 1)"), {"p": badges})
+    with engine.connect() as c:
+        n = c.execute(text("select count(*) from audit_logs where action = 'stock.transfer'")).scalar()
+    assert n >= 2

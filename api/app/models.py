@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -63,7 +64,7 @@ class Branch(Base):
 
 
 class User(Base):
-    """App profile mapped to the auth provider's user (Supabase auth.users.id)."""
+    """App profile. `auth_user_id` is the `sub` of the tokens we sign at sign-in; the password lives in UserCredential."""
 
     __tablename__ = "users"
     __table_args__ = (
@@ -78,6 +79,27 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20))
     branch_id: Mapped[uuid.UUID | None] = fk("branches.id", nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    created_at: Mapped[datetime] = created()
+
+
+class UserCredential(Base):
+    """Password hash + brute-force counters, kept apart from `users` so the API's row-level-security role
+    can never read them (no grants, RLS on). Only the sign-in and admin password code touch it, as the owner."""
+
+    __tablename__ = "user_credentials"
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    failed_attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = created()
+
+
+class StoredFile(Base):
+    """Generated PDFs when STORAGE_BACKEND=db (production). Same access rule as UserCredential: owner only."""
+
+    __tablename__ = "stored_files"
+    key: Mapped[str] = mapped_column(String(300), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = created()
 
 
@@ -321,6 +343,27 @@ class InvoicePayment(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     reference: Mapped[str] = mapped_column(String(200), server_default="")  # UTR, card slip, cheque / DD no ...
     line_order: Mapped[int] = mapped_column(Integer)
+
+
+class StockTransfer(Base):
+    """Central admin moves `quantity` of a material between branches. Append-only (no UPDATE/DELETE grant)."""
+
+    __tablename__ = "stock_transfers"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_stock_transfers_qty"),
+        CheckConstraint("from_branch_id <> to_branch_id", name="ck_stock_transfers_branches"),
+        Index("ix_stock_transfers_event_product", "event_id", "product_id"),
+    )
+    id: Mapped[uuid.UUID] = pk()
+    event_id: Mapped[uuid.UUID] = fk("events.id")
+    product_id: Mapped[uuid.UUID] = fk("products.id")
+    from_branch_id: Mapped[uuid.UUID] = fk("branches.id")
+    to_branch_id: Mapped[uuid.UUID] = fk("branches.id")
+    quantity: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str] = mapped_column(String(300), server_default="")
+    created_by: Mapped[uuid.UUID | None] = fk("users.id", nullable=True)
+    created_by_name: Mapped[str] = mapped_column(String(200), server_default="")
+    created_at: Mapped[datetime] = created()
 
 
 class BranchStock(Base):

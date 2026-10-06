@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, UserPlus } from "lucide-react";
+import { KeyRound, Pencil, UserPlus } from "lucide-react";
 import { EditDialog, orNull, str, type FieldSpec } from "@/components/admin/edit-dialog";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
@@ -17,6 +17,7 @@ const BRANCHES: [string, string][] = [["", "— none (central admin) —"], ["SB
 export default function UsersPage() {
   const list = useAsync(() => api<User[]>("/admin/users"), "admin-users");
   const [editing, setEditing] = useState<User | "new" | null>(null);
+  const [resetting, setResetting] = useState<User | null>(null);
   const isNew = editing === "new";
   const user = editing && editing !== "new" ? editing : null;
 
@@ -25,7 +26,7 @@ export default function UsersPage() {
     { key: "name", label: "Name" },
     { key: "role", label: "Role", type: "select", options: ROLES },
     { key: "branch_code", label: "Branch", type: "select", options: BRANCHES, hint: "Required for branch users and branch admins." },
-    ...(isNew ? [{ key: "password", label: "Initial password (min 8)", type: "text" as const, hint: "Needed when creating a login in Supabase." }] : []),
+    ...(isNew ? [{ key: "password", label: "Initial password (min 8)", type: "text" as const, hint: "Share it with the person privately; they can change it after signing in." }] : []),
     { key: "active", label: "Account is active", type: "checkbox" },
   ];
 
@@ -42,7 +43,10 @@ export default function UsersPage() {
                 <tr key={u.id} data-testid="user-row">
                   <td className="font-medium">{u.name}</td><td>{u.email}</td><td>{ROLES.find((r) => r[0] === u.role)?.[1] ?? u.role}</td><td>{u.branch_code ?? "All"}</td>
                   <td>{u.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-slate-100">Inactive</Badge>}</td>
-                  <td className="text-right"><Button variant="outline" size="icon-sm" aria-label={`Edit ${u.name}`} onClick={() => setEditing(u)}><Pencil /></Button></td>
+                  <td className="text-right"><div className="flex justify-end gap-1.5">
+                    <Button variant="outline" size="icon-sm" aria-label={`Reset password for ${u.name}`} title="Reset password" onClick={() => setResetting(u)}><KeyRound /></Button>
+                    <Button variant="outline" size="icon-sm" aria-label={`Edit ${u.name}`} onClick={() => setEditing(u)}><Pencil /></Button>
+                  </div></td>
                 </tr>
               ))}
             </tbody>
@@ -63,6 +67,20 @@ export default function UsersPage() {
             list.reload();
           }}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {resetting && (
+        <EditDialog
+          key={`reset-${resetting.id}`}
+          title={`Reset password for ${resetting.name}`}
+          description="Sets a new password straight away and unlocks the account if it was locked after wrong attempts."
+          fields={[{ key: "password", label: "New password (min 8)", type: "text", wide: true }]}
+          initial={{ password: "" }}
+          submitLabel="Set password"
+          onSave={async (v) => {
+            await api(`/admin/users/${resetting.id}/password`, { method: "PUT", body: JSON.stringify({ password: str(v.password) }) });
+          }}
+          onClose={() => setResetting(null)}
         />
       )}
     </>

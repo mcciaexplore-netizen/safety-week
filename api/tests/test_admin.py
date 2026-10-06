@@ -105,21 +105,6 @@ def test_user_management_and_lockout_guards(client, people, su):
     client.put(f"{A}/users/{bho['id']}", headers=su, json={"name": "Scratch", "role": "BRANCH_USER", "branch_code": "BHO", "active": True})
 
 
-def test_create_user_in_dev_mode_only(client, su):
-    from app.config import settings
-
-    body = {"email": "new.person@mccia-test.com", "name": "New Person", "role": "BRANCH_USER", "branch_code": "AHL",
-            "active": True}
-    assert client.post(f"{A}/users", json=body, headers=su).status_code == 501     # no login service configured
-    settings.dev_login = True
-    try:
-        r = client.post(f"{A}/users", json=body, headers=su)
-        assert r.status_code == 201 and r.json()["branch_code"] == "AHL"
-        assert client.post(f"{A}/users", json=body, headers=su).status_code == 422  # duplicate e-mail
-    finally:
-        settings.dev_login = False
-
-
 # ---------------------------------------------------------------- event, products, and the 2026 -> 2027 guard
 def test_event_dates_year_and_the_open_guard(client, su, people):
     prods = client.get("/api/v1/products").json()

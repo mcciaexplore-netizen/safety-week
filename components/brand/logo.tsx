@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** MCCIA wordmark extracted from the source workbook (low-res; request the original from MCCIA). */
+/** MCCIA logo (public/brand/mccia-logo.png; the API keeps a copy for the PDF in api/app/assets/logo.png). */
 export function MCCIALogo({
   className,
   height = 28,

@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 type Update = (updater: (d: InvoiceDraft) => InvoiceDraft) => void;
 
-function Section({
+export function Section({
   title,
   hint,
   children,
@@ -27,10 +27,10 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-4 rounded-lg border bg-card p-5">
+    <section className="space-y-5 rounded-xl border bg-card p-6 text-base sm:p-8 [&_input]:h-10 [&_input]:text-base [&_label]:text-base [&_select]:h-10 [&_select]:text-base [&_textarea]:text-base [&_.text-xs]:text-sm">
       <div>
-        <h2 className="font-semibold">{title}</h2>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        <h2 className="text-xl font-semibold">{title}</h2>
+        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
       </div>
       {children}
     </section>
@@ -78,8 +78,8 @@ export function InvoiceForm({
   errors: FieldErrors;
   update: Update;
   disabled: boolean;
-  /** "details" = customer + invoice info (above the sheet); "summary" = totals, words, payment (below it). */
-  part: "details" | "summary";
+  /** customer / info = the two detail sections (info sits below the materials); "summary" = totals, words, payment. */
+  part: "customer" | "info" | "summary";
 }) {
   const setCustomer = (field: keyof InvoiceCustomer, value: string) =>
     update((d) => ({ ...d, customer: { ...d.customer, [field]: value } }));
@@ -87,8 +87,7 @@ export function InvoiceForm({
 
   return (
     <fieldset disabled={disabled} className="min-w-0 space-y-5 disabled:opacity-70">
-      {part === "details" && (
-        <>
+      {part === "customer" && (
       <Section title="Customer information" hint="Printed in the customer block of the invoice.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
@@ -150,7 +149,9 @@ export function InvoiceForm({
           </Field>
         </div>
       </Section>
+      )}
 
+      {part === "info" && (
       <Section title="Invoice information">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={LABELS.invoiceNo} htmlFor="invoiceNo">
@@ -214,12 +215,11 @@ export function InvoiceForm({
           </Field>
         </div>
       </Section>
-        </>
       )}
 
       {part === "summary" && (
       <Section title="Summary and footer">
-        <dl className="space-y-1.5 rounded-md bg-secondary/60 p-3 text-sm tabular-nums">
+        <dl className="space-y-1.5 rounded-md bg-secondary/60 p-4 text-base tabular-nums">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{LABELS.basic}</dt>
             <dd>{formatMoney(t.basicTotal)}</dd>
@@ -243,7 +243,7 @@ export function InvoiceForm({
               {formatMoney(Math.abs(t.roundingAdjustment))}
             </dd>
           </div>
-          <div className="flex items-baseline justify-between border-t pt-1.5 text-base font-semibold">
+          <div className="flex items-baseline justify-between border-t pt-1.5 text-xl font-semibold">
             <dt>Payable (rounded)</dt>
             <dd data-testid="form-rounded-total">{formatRupees(t.roundedTotal)}</dd>
           </div>
@@ -289,11 +289,11 @@ export function InvoiceForm({
           <p className="text-xs text-muted-foreground">Optional notes, printed after the payment modes above.</p>
         </div>
 
-        <div className="rounded-md border border-dashed p-3 text-sm">
+        <div className="rounded-md border border-dashed p-4 text-base">
           <p className="font-medium">{LABELS.forOrg}</p>
           <p className="text-muted-foreground">
             {LABELS.signatory}
-            {SIGNATORY.enabled ? " — MCCIA stamp and signature are applied automatically." : "."}
+            {SIGNATORY.enabled ? " — the branch seal is applied automatically." : "."}
           </p>
         </div>
       </Section>

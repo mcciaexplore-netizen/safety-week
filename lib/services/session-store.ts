@@ -3,7 +3,7 @@ import type { Session } from "./types";
 /**
  * Mock session persistence (localStorage). Exposes a subscribe/getSnapshot
  * pair so React can read it with useSyncExternalStore. Replace with real
- * auth state (Supabase Auth) in Phase 5.
+ * auth state (our own sign-in) in Phase 5.
  */
 const KEY = "nsw27.mock.session.v1";
 const listeners = new Set<() => void>();

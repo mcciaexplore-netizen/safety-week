@@ -52,15 +52,18 @@ test("central admin: combined workbook for all five branches, and each branch se
   await expect(page).toHaveURL(/\/admin$/);
   await page.getByRole("link", { name: "Invoices", exact: true }).click();
 
-  const [all] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "All 5 branches combined" }).click()]);
+  const [all] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download all branches Excel" }).click()]);
   expect(all.suggestedFilename()).toMatch(/^invoices-ALL-\d{4}-\d{2}-\d{2}\.xlsx$/);
   expect(await isXlsx((await all.path())!)).toBe(true);
   for (const [code, name] of [["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]]) {
-    const [one] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: `Download ${name} invoices` }).click()]);
+    await page.getByRole("group", { name: "Branch" }).getByRole("button", { name, exact: true }).click();
+    const [one] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: `Download ${name} Excel` }).click()]);
     expect(one.suggestedFilename()).toMatch(new RegExp(`^invoices-${code}-\\d{4}-\\d{2}-\\d{2}\\.xlsx$`));
   }
   // the central admin can also look at any branch's stock
   await page.getByRole("link", { name: "Stock" }).click();
+  await expect(page.getByTestId("stock-matrix-row")).toHaveCount(39);          // all five branches at once
+  await page.getByRole("tab", { name: "Set opening stock" }).click();
   await page.getByLabel("Branch").selectOption("BHO");
   await expect(page.getByTestId("stock-row")).toHaveCount(39);
 });

@@ -1,3 +1,4 @@
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,22 +7,25 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Supabase/Postgres in production; a local pgserver instance in dev (see app/devdb.py).
+    # "production" switches on start-up safety checks (see main.py) and refuses the dev sign-in.
+    environment: str = "development"
+    # PostgreSQL: Neon in production (use its POOLED connection string here), a local pgserver instance in dev
+    # (see app/devdb.py). Neon needs `?sslmode=require` on the URL.
     database_url: str = "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/nsw"
-    # Supabase Auth. Use the JWT secret (HS256 projects) OR just the project URL (asymmetric
-    # signing keys, verified through the project's JWKS). Never expose these to the browser.
-    supabase_url: str = ""
-    supabase_jwt_secret: str = ""
-    supabase_service_key: str = ""  # only used by app/admin_cli.py to create users
+    # Optional: Neon's DIRECT (non-pooled) connection string. Used only by `alembic upgrade`, because
+    # schema migrations should not go through the pooler.
+    database_url_direct: str = ""
+    # Our own sign-in (POST /api/v1/auth/login) signs short-lived tokens with this secret (HS256).
+    # 32+ random characters; never expose it to the browser. (SUPABASE_JWT_SECRET is still read, for old .env files.)
+    jwt_secret: str = Field(default="", validation_alias=AliasChoices("JWT_SECRET", "SUPABASE_JWT_SECRET"))
+    token_hours: int = 12  # how long one sign-in lasts
     # DEV ONLY: exposes POST /api/v1/dev/token (sign in as any existing profile, no password).
-    # Ignored whenever SUPABASE_URL is set, so it cannot be switched on in a real deployment.
+    # Never registered when ENVIRONMENT=production.
     dev_login: bool = False
-    # PDF generation: Chromium opens WEB_URL/print/invoice/... (the same template as the preview).
-    web_url: str = "http://localhost:3000"
-    print_token_secret: str = ""  # set in production if you run more than one API instance
-    pdf_autogenerate: bool = True  # render right after submit/revise (else on first download)
-    storage_dir: str = "storage"  # local dev storage; Supabase Storage is used when its keys are set
-    storage_bucket: str = "invoice-pdfs"  # must be a PRIVATE bucket
+    pdf_autogenerate: bool = True  # create the PDF right after submit/revise (else on first download)
+    # Where generated PDFs are kept: "local" (a folder, dev/tests) or "db" (a table in the database, production).
+    storage_backend: str = "local"
+    storage_dir: str = "storage"
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3100"]
 
 

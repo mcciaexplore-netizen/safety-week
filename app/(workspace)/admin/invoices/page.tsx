@@ -8,7 +8,7 @@ import { DownloadButton } from "@/components/app/download-button";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAsync } from "@/hooks/use-async";
 import { formatDateTime, formatInvoiceDate, formatRupees } from "@/lib/format";
@@ -35,10 +35,14 @@ export default function AdminInvoices() {
   return (
     <>
       <PageHeader title="Invoices" description="Every invoice from all branches. Open one to see its versions, cancel it, or download the PDF." />
-      <DailyExcel central />
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Branch">
+        {BRANCHES.map(([v, l]) => (
+          <Button key={v} variant={branch === v ? "default" : "outline"} aria-pressed={branch === v} onClick={() => setBranch(v)}>{l}</Button>
+        ))}
+      </div>
+      <DailyExcel central branch={branch} />
       <div className="flex flex-col gap-3 sm:flex-row">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search invoice ID or company…" aria-label="Search invoices" className="flex-1" />
-        <select className={SEL} aria-label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)}>{BRANCHES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         <select className={SEL} aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{s || "All statuses"}</option>)}</select>
       </div>
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : !list.data ? <LoadingRows rows={8} /> : list.data.length === 0 ? <EmptyState title="No invoices match" /> : (

@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** Runs checks against the proforma shown by the floating Preview button, then closes it again. */
+async function inPreview(page: Page, check: () => Promise<void>) {
+  await page.getByTestId("floating-preview").click();
+  await expect(page.getByTestId("preview-dialog")).toBeVisible();
+  await check();
+  await page.getByTestId("preview-dialog").getByRole("button", { name: "Close", exact: true }).first().click();
+  await expect(page.getByTestId("preview-dialog")).toHaveCount(0);
+}
+const confirmSubmit = (page: Page) => page.getByTestId("confirm-submit").click();
+
 async function newInvoice(page: Page) {
   await page.goto("/login?branch=TIL");
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -9,7 +19,7 @@ async function newInvoice(page: Page) {
   // 10 x Ball Pens (Matt Finish) = 350 + 18% = 413 ; 2 x Flags - Normal = 750 + 5% = 787.50 -> payable Rs 1,201
   await page.getByLabel("Quantity for Ball Pens (Matt Finish)", { exact: true }).fill("10");
   await page.getByLabel("Quantity for Flags - Normal", { exact: true }).fill("2");
-  await expect(page.getByTestId("paper-rounded")).toHaveText("1,201.00");
+  await expect(page.getByTestId("form-rounded-total")).toHaveText("₹1,201.00");
 }
 
 const paperPayment = (page: Page) => page.getByTestId("paper-payment");
@@ -20,17 +30,17 @@ test("payment: one mode takes the full amount automatically and follows the tota
   await page.getByLabel("Mode of payment").selectOption("UPI");
   await page.getByLabel("Payment reference").fill("UTR 604794369987");
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
-  await expect(paperPayment(page)).toContainText("Payment Details : UPI Rs. 1,201.00 (UTR 604794369987)");
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Payment Details : UPI Rs. 1,201.00 (UTR 604794369987)"));
   // change the order: the payment still equals the payable amount, nothing to re-type
   await page.getByLabel("Quantity for Flags - Normal", { exact: true }).fill("");
-  await expect(page.getByTestId("paper-rounded")).toHaveText("413.00");
-  await expect(paperPayment(page)).toContainText("UPI Rs. 413.00");
+  await expect(page.getByTestId("form-rounded-total")).toHaveText("₹413.00");
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("UPI Rs. 413.00"));
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
   // every mode is offered, including "Other"
   const options = await page.getByLabel("Mode of payment").locator("option").allTextContents();
   expect(options).toEqual(["Not paid yet", "Cash", "UPI", "Card", "Net banking", "Other"]);
   await page.getByLabel("Mode of payment").selectOption("");
-  await expect(paperPayment(page)).not.toContainText("Rs.");
+  await inPreview(page, () => expect(paperPayment(page)).not.toContainText("Rs."));
 });
 
 test("payment: split between UPI and cash, part payment, over-payment refused, and it survives saving", async ({ page }) => {
@@ -48,7 +58,7 @@ test("payment: split between UPI and cash, part payment, over-payment refused, a
   await page.getByRole("button", { name: "Fill balance on payment 2" }).click();
   await expect(page.getByLabel("Amount for payment 2")).toHaveValue("701");
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
-  await expect(paperPayment(page)).toContainText("UPI Rs. 500.00 (UTR 111) + Cash Rs. 701.00");
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("UPI Rs. 500.00 (UTR 111) + Cash Rs. 701.00"));
   await page.getByTestId("payment-section").screenshot({ path: "test-results/15-split-payment.png" });
 
   // more than the invoice is refused, and says so live
@@ -63,7 +73,7 @@ test("payment: split between UPI and cash, part payment, over-payment refused, a
   await expect(page.getByTestId("payment-status")).toContainText("balance due ₹501.00");
   await page.getByRole("button", { name: /Save Draft/ }).click();
   await expect(page.getByTestId("save-state")).toContainText("Draft saved");
-  await expect(paperPayment(page)).toContainText("UPI Rs. 500.00 (UTR 111) + Cash Rs. 200.00  |  Balance due Rs. 501.00");
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("UPI Rs. 500.00 (UTR 111) + Cash Rs. 200.00  |  Balance due Rs. 501.00"));
 
   // reopening shows the split exactly as entered
   await page.reload();
@@ -75,6 +85,7 @@ test("payment: split between UPI and cash, part payment, over-payment refused, a
   // finish it: fill the balance, submit, and the history shows "Paid"
   await page.getByRole("button", { name: "Fill balance on payment 2" }).click();
   await page.getByRole("button", { name: "Submit", exact: true }).click();
+  await confirmSubmit(page);
   await expect(page.getByText("Invoice submitted")).toBeVisible();
   await page.goto("/invoices");
   await page.getByLabel("Search invoices").fill("Payment Test Co");
@@ -91,7 +102,7 @@ test("payment: 'Other' needs a description; back to a single payment", async ({ 
   await expect(page.getByText("Say how it was paid")).toBeVisible();
   await page.getByLabel("Payment reference").fill("Demand draft 552211");
   await expect(page.getByText("Say how it was paid")).toHaveCount(0);
-  await expect(paperPayment(page)).toContainText("Other Rs. 1,201.00 (Demand draft 552211)");
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Other Rs. 1,201.00 (Demand draft 552211)"));
 
   await page.getByRole("button", { name: "Split payment" }).click();
   await expect(page.getByTestId("payment-row")).toHaveCount(2);

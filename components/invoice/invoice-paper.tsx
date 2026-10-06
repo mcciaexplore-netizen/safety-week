@@ -12,7 +12,7 @@ import type { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * The printed MCCIA Pro Forma Invoice. One <table> mirrors the Excel sheet's
+ * The printed MCCIA Proforma Invoice. One <table> mirrors the Excel sheet's
  * merge structure (docs/invoice-spec.md §1-§7), so columns line up exactly as in
  * the workbook. Pure: it renders an `InvoiceView` and owns no state. The same
  * component will be rendered by the PDF pipeline later (PLAN Phase 7).
@@ -98,9 +98,10 @@ function buildRows(view: InvoiceView, products: Product[], full: boolean): Paper
 
   // Full-catalogue mode: every workbook row, in workbook order, as printed in the Excel.
   const byProduct = new Map(view.lines.filter((l) => l.productId).map((l) => [l.productId, l]));
-  const rows: PaperRow[] = products.map((p) => {
+  // numbered 1..n in the order shown (the workbook's own Sr. skips the variant rows)
+  const rows: PaperRow[] = products.map((p, idx) => {
     const line = byProduct.get(p.id);
-    if (line) return fromLine(line, p.srNo);
+    if (line) return fromLine(line, idx + 1);
     const c = computeLine({
       rate: p.currentRate,
       quantity: 0,
@@ -110,7 +111,7 @@ function buildRows(view: InvoiceView, products: Product[], full: boolean): Paper
     });
     return {
       productId: p.id,
-      sr: p.srNo,
+      sr: idx + 1,
       particulars: p.name,
       hsn: p.hsnCode,
       rate: p.currentRate,
@@ -126,7 +127,7 @@ function buildRows(view: InvoiceView, products: Product[], full: boolean): Paper
   });
   // Lines whose product is no longer in the list (deactivated, or a custom line) must never disappear.
   const listed = new Set(products.map((p) => p.id));
-  for (const l of view.lines) if (!l.productId || !listed.has(l.productId)) rows.push(fromLine(l, null));
+  for (const l of view.lines) if (!l.productId || !listed.has(l.productId)) rows.push(fromLine(l, rows.length + 1));
   return rows;
 }
 
@@ -136,7 +137,7 @@ const pct = (n: number) => `${n.toFixed(1)}%`;
 
 function renderCell(key: ColKey, r: PaperRow): string {
   switch (key) {
-    case "sr": return r.sr === null ? "" : r.sr.toFixed(1);
+    case "sr": return r.sr === null ? "" : String(r.sr);
     case "part": return r.particulars;
     case "hsn": return r.hsn;
     case "rate": return formatMoney(r.rate);
@@ -445,11 +446,11 @@ export function InvoicePaper({
               {header.forOrg}
             </Td>
           </tr>
-          {/* Stamp + signature area */}
+          {/* Branch seal area */}
           <tr>
             <Td colSpan={3} rowSpan={3} className={B}>
               {SIGNATORY.enabled && (
-                <div className="flex h-[66px] items-center justify-center gap-1">
+                <div className="flex h-[66px] items-center justify-center">
                   {/* Round seal of the branch that issued the invoice: fixed, chosen from the invoice number. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -462,13 +463,6 @@ export function InvoicePaper({
                     onError={(e) => {
                       if (!e.currentTarget.src.endsWith(SIGNATORY.stampSrc)) e.currentTarget.src = SIGNATORY.stampSrc; // seal file missing
                     }}
-                  />
-                  <Image
-                    src={SIGNATORY.signatureSrc}
-                    alt="Authorised signatory"
-                    width={70}
-                    height={56}
-                    className="h-[54px] w-auto"
                   />
                 </div>
               )}

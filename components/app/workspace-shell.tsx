@@ -28,13 +28,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
 import { EVENT } from "@/lib/config/app-config";
-import { API_MODE, services } from "@/lib/services";
+import { API_MODE, REAL_AUTH, services } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/invoices", label: "Invoices", icon: ListChecks },
-  { href: "/invoices/new", label: "New Pro Forma", icon: FilePlus2 },
+  { href: "/invoices/new", label: "New Proforma", icon: FilePlus2 },
 ];
 const ADMIN_NAV = [
   { href: "/stock", label: "Stock", icon: Boxes },
@@ -232,9 +232,12 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             </span>
           </div>
         </header>
-        <div className="border-b bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-900 sm:px-6">
-          {API_MODE ? "Development build — connected to the local API." : "Demo mode — sample data stored in this browser only."}
-        </div>
+        {/* only on a developer's machine (dev sign-in) or in the browser-only demo; never on the live site */}
+        {!REAL_AUTH && (
+          <div className="border-b bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-900 sm:px-6">
+            {API_MODE ? "Development build — connected to the local API." : "Demo mode — sample data stored in this browser only."}
+          </div>
+        )}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>

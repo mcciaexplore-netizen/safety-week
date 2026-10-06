@@ -54,7 +54,7 @@ test("full shell flow: landing to branch workspace, history, edit, isolation, si
   await expect(page.getByText("Invoice not available")).toBeVisible();
 
   // create a draft through the real editor
-  await page.getByRole("link", { name: "New Pro Forma" }).first().click();
+  await page.getByRole("link", { name: "New Proforma" }).first().click();
   await page.getByLabel("Company Name", { exact: true }).fill("Shell Flow Industries");
   await page.getByRole("button", { name: /Save Draft/ }).click();
   await expect(page.getByTestId("save-state")).toContainText("Draft saved");

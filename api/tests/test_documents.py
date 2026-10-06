@@ -1,24 +1,12 @@
-"""PDF generation through the REAL path: API -> Chromium -> web app /print page (the same
-<InvoicePaper> the live preview uses) -> PDF -> private storage.
-
-Needs the web app's dependencies (`npm install` in the project root) and Chromium
-(`python -m playwright install chromium`); skipped otherwise.
-"""
+"""PDF generation through the real path: API -> ReportLab (app/pdf.py) -> storage, then the PDF text is read back
+and compared with the invoice."""
 
 import io
-import os
 import re
-import subprocess
-import threading
 import unicodedata
-import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
-import httpx
 import pytest
-import uvicorn
 from pypdf import PdfReader
 from sqlalchemy import text
 
@@ -28,43 +16,13 @@ from app.storage import LocalStorage
 from tests.conftest import mint
 
 API = "/api/v1"
-API_PORT, WEB_PORT = 8765, 3300
-WEB_ROOT = Path(__file__).resolve().parents[2]
-
-pytestmark = pytest.mark.skipif(not (WEB_ROOT / "node_modules").exists(), reason="web app not installed")
 
 
 @pytest.fixture(scope="module", autouse=True)
 def render_stack():
-    from app.main import app
-
-    tsconfig = WEB_ROOT / "tsconfig.json"
-    tsconfig_before = tsconfig.read_text("utf-8")  # `next dev` rewrites it; put it back afterwards
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=API_PORT, log_level="warning"))
-    threading.Thread(target=server.run, daemon=True).start()
-    web = subprocess.Popen(
-        f"npm run dev -- -p {WEB_PORT}", shell=True, cwd=WEB_ROOT, stdout=open(Path(os.environ.get("TEMP", ".")) / "nsw-web-test.log", "w"), stderr=subprocess.STDOUT,
-        env={**os.environ, "NEXT_PUBLIC_API_URL": f"http://127.0.0.1:{API_PORT}", "NEXT_DIST_DIR": ".next-test"},
-    )
-    try:
-        deadline = time.time() + 120
-        while time.time() < deadline:
-            try:
-                if httpx.get(f"http://127.0.0.1:{WEB_PORT}/", timeout=20).status_code == 200:
-                    httpx.get(f"http://127.0.0.1:{WEB_PORT}/print/invoice/{uuid.uuid4()}?v=1&t=warmup", timeout=60)  # compile route
-                    break
-            except httpx.HTTPError:
-                time.sleep(2)
-        else:
-            pytest.skip("web dev server did not start")
-        settings.pdf_autogenerate = True
-        yield
-    finally:
-        settings.pdf_autogenerate = False
-        server.should_exit = True
-        subprocess.run(f"taskkill /F /T /PID {web.pid}", shell=True, capture_output=True)
-        time.sleep(1)
-        tsconfig.write_text(tsconfig_before, "utf-8")
+    settings.pdf_autogenerate = True
+    yield
+    settings.pdf_autogenerate = False
 
 
 @pytest.fixture(scope="module")
@@ -147,22 +105,6 @@ def test_secure_download(client, people, prods):
     assert client.get(url + "?version=9", headers=people["sbr"]["h"]).status_code == 404
     draft = client.post(f"{API}/invoices", json=body(prods, [("Badges", 1)], action="draft"), headers=people["sbr"]["h"]).json()
     assert client.get(f"{API}/invoices/{draft['id']}/document", headers=people["sbr"]["h"]).status_code == 409
-
-
-def test_print_endpoint_needs_a_valid_token_for_that_exact_version(client, people, prods):
-    from app.documents import print_token
-
-    inv = client.post(f"{API}/invoices", json=body(prods, [("Badges", 1)]), headers=people["bho"]["h"]).json()
-    i = inv["id"]
-    good = print_token(uuid.UUID(i), 1)
-    assert client.get(f"{API}/print/{i}?v=1&t={good}").json()["invoice_number"] == inv["invoice_number"]
-    assert client.get(f"{API}/print/{i}?v=1&t=not-a-real-token").status_code == 403
-    assert client.get(f"{API}/print/{i}?v=2&t={good}").status_code == 403                  # token is bound to v1
-    assert client.get(f"{API}/print/{uuid.uuid4()}?v=1&t={good}").status_code == 403       # ...and to this invoice
-    assert client.get(f"{API}/print/{i}?v=1&t={mint(uuid.uuid4())}").status_code == 403    # a login token is not a print token
-    import jwt
-    expired = jwt.encode({"inv": i, "v": 1, "aud": "print", "exp": int(time.time()) - 5}, "print-secret-print-secret-print-secret", "HS256")
-    assert client.get(f"{API}/print/{i}?v=1&t={expired}").status_code == 403
 
 
 def test_pdf_is_created_on_first_download_when_background_generation_is_off(client, people, prods):

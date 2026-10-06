@@ -1,8 +1,8 @@
 """DEV ONLY: one profile per branch with the same names/e-mails the web demo shows (plus meera@ = Tilak
 Road BRANCH_ADMIN and admin@ = central admin, to try the admin screens), so the
-login page works unchanged against the real API while Supabase is not set up yet.
+login page works unchanged against the real API (dev sign-in, no password).
 
-    python -m app.dev_seed         (then start the API with DEV_LOGIN=true and no SUPABASE_URL)
+    python -m app.dev_seed         (then start the API with DEV_LOGIN=true; ENVIRONMENT must not be production)
 
 Never run this against production. Real users are created with app.admin_cli.
 """

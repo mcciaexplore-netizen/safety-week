@@ -16,13 +16,10 @@ _server = pgserver.get_server(_dir, cleanup_mode="delete")
 os.environ["DATABASE_URL"] = _server.get_uri().replace("postgresql://", "postgresql+psycopg://", 1)
 
 SECRET = "test-secret-test-secret-test-secret-32b"
-os.environ["SUPABASE_JWT_SECRET"] = SECRET
-os.environ["SUPABASE_URL"] = ""
+os.environ["JWT_SECRET"] = SECRET
 os.environ["DEV_LOGIN"] = "false"  # tests must not inherit a developer .env
 os.environ["PDF_AUTOGENERATE"] = "false"  # only tests/test_documents.py turns this on (needs the web app)
-os.environ["WEB_URL"] = "http://127.0.0.1:3300"
 os.environ["CORS_ORIGINS"] = '["http://127.0.0.1:3300"]'
-os.environ["PRINT_TOKEN_SECRET"] = "print-secret-print-secret-print-secret"
 os.environ["STORAGE_DIR"] = tempfile.mkdtemp(prefix="nsw_pdf_")
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +54,7 @@ def client():
     return TestClient(app)
 
 
-# ---- identities: real profile rows + tokens minted exactly the way Supabase signs them ----
+# ---- identities: real profile rows + tokens minted exactly the way the API signs them at sign-in ----
 import time  # noqa: E402
 import uuid  # noqa: E402
 

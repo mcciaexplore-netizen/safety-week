@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 type Update = (updater: (d: InvoiceDraft) => InvoiceDraft) => void;
 const SELECT =
-  "h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "h-10 w-full rounded-lg border border-input bg-background px-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /**
  * Mode of payment. Normal case: pick one mode and the full payable amount is taken automatically.
@@ -105,7 +105,7 @@ export function PaymentSection({
             Split payment
           </Button>
           {rows[0] && (
-            <p className="text-sm text-muted-foreground sm:col-span-3">
+            <p className="text-base text-muted-foreground sm:col-span-3">
               Full amount received: <strong className="text-foreground">{formatRupees(payable)}</strong>
             </p>
           )}
@@ -186,7 +186,7 @@ export function PaymentSection({
                 Back to a single payment
               </Button>
             </div>
-            <p className="text-sm tabular-nums" data-testid="payment-summary">
+            <p className="text-base tabular-nums" data-testid="payment-summary">
               Paid <strong>{formatRupees(paid)}</strong> of {formatRupees(payable)}
               {" · "}
               <span className={cn(balance < 0 ? "text-destructive" : balance > 0 ? "text-amber-700" : "text-emerald-700")}>

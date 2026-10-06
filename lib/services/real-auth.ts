@@ -3,14 +3,14 @@ import type { Branch, UserRole } from "@/lib/types";
 import { getSession, setSession } from "./session-store";
 import { AuthError, type AuthService, type Session } from "./types";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+/** Local development only: sign in without a password through the API's dev endpoint (needs DEV_LOGIN=true there). */
+const DEV_LOGIN = process.env.NEXT_PUBLIC_DEV_LOGIN === "true";
 
 /** The web app talks to the real API whenever NEXT_PUBLIC_API_URL is set; otherwise it is the mock demo. */
 export const API_MODE = !!API_URL;
-/** Password sign-in through Supabase (needs all three vars). Without it, API mode uses the dev token endpoint. */
-export const REAL_AUTH = !!(SUPABASE_URL && ANON_KEY && API_URL);
+/** Real password sign-in against our API (the default whenever the API is used). */
+export const REAL_AUTH = API_MODE && !DEV_LOGIN;
 
 /** Stand-in "branch" for the central admin, who belongs to none of the five. Never sent to the API. */
 export const CENTRAL_BRANCH: Branch = {
@@ -26,17 +26,17 @@ interface Me {
 }
 
 /**
- * Sign-in against Supabase Auth (plain REST, no SDK), then ask OUR API who the token
+ * Sign-in against our API (`POST /auth/login`: e-mail + password -> a short-lived token), then ask the API who the token
  * belongs to. The branch shown in the workspace is what the SERVER answers; the branch
  * picked on the previous screen is only a hint and is checked against it.
  */
 export const realAuth: AuthService = {
   async signIn({ branchId, email, password }) {
-    // DEV: no Supabase yet -> the API's dev endpoint (exists only when DEV_LOGIN=true and SUPABASE_URL is unset).
+    // DEV_LOGIN: the API's password-less dev endpoint (it exists only when the API runs with DEV_LOGIN=true).
     const res = REAL_AUTH
-      ? await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      ? await fetch(`${API_URL}/api/v1/auth/login`, {
           method: "POST",
-          headers: { apikey: ANON_KEY!, "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         })
       : await fetch(`${API_URL}/api/v1/dev/token`, {
@@ -44,7 +44,13 @@ export const realAuth: AuthService = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
-    if (!res.ok) throw new AuthError(REAL_AUTH ? "Incorrect e-mail or password." : "Unknown dev user.");
+    if (!res.ok) {
+      if (REAL_AUTH && res.status === 429) {
+        const detail = ((await res.json().catch(() => null)) as { detail?: string } | null)?.detail;
+        throw new AuthError(detail ?? "Too many attempts. Please try again later.");
+      }
+      throw new AuthError(REAL_AUTH ? "Incorrect e-mail or password." : "Unknown dev user.");
+    }
     const { access_token: token } = (await res.json()) as { access_token: string };
 
     const meRes = await fetch(`${API_URL}/api/v1/me`, { headers: { Authorization: `Bearer ${token}` } });
@@ -75,12 +81,6 @@ export const realAuth: AuthService = {
   },
 
   async signOut() {
-    const token = getSession()?.accessToken;
-    setSession(null);
-    if (token && REAL_AUTH)
-      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
-        method: "POST",
-        headers: { apikey: ANON_KEY!, Authorization: `Bearer ${token}` },
-      }).catch(() => {}); // ponytail: best-effort revoke; the token expires on its own anyway
+    setSession(null); // tokens are short-lived and kept only in this browser; nothing to revoke server-side
   },
 };

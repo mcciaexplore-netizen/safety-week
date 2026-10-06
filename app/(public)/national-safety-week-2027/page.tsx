@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "National Safety Week 2027" };
 const STEPS = [
   { title: "Select your branch", text: "Choose one of the five MCCIA branches." },
   { title: "Sign in", text: "Sign in to your branch workspace." },
-  { title: "Create a Pro Forma", text: "Add customer details and materials; totals update as you type." },
+  { title: "Create a Proforma", text: "Add customer details and materials; totals update as you type." },
   { title: "Review and download", text: "Check the live invoice preview, save, and download the PDF." },
 ];
 
@@ -41,7 +41,7 @@ export default function NationalSafetyWeekPage() {
         </h1>
         <p className="text-lg text-muted-foreground">
           Industries across the region order safety-awareness material — banners, badges, caps, posters,
-          T-shirts and more — through MCCIA branches. This system prepares the Pro Forma Invoice for each
+          T-shirts and more — through MCCIA branches. This system prepares the Proforma Invoice for each
           order.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">

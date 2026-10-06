@@ -4,14 +4,14 @@ from datetime import date
 from typing import Annotated
 
 import jwt
-from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import admin, documents, exports, stock
+from . import admin, documents, exports, login, stock
 from . import repositories as repo
 from . import services
 from .auth import Principal, current_principal
@@ -32,7 +32,25 @@ from .schemas import (
     VersionOut,
 )
 
-app = FastAPI(title="MCCIA Safety Week Pro Forma API")
+def _check_production() -> None:
+    """A production deployment refuses to start with an unsafe configuration."""
+    if settings.environment != "production":
+        return
+    problems = []
+    if len(settings.jwt_secret) < 32:
+        problems.append("JWT_SECRET must be 32+ random characters")
+    if settings.dev_login:
+        problems.append("DEV_LOGIN must be off")
+    if settings.storage_backend != "db":
+        problems.append("STORAGE_BACKEND must be 'db' (the host's disk is wiped on every deploy)")
+    if any("localhost" in o or "127.0.0.1" in o for o in settings.cors_origins):
+        problems.append("CORS_ORIGINS must list only the real website address")
+    if problems:
+        raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))
+
+
+_check_production()
+app = FastAPI(title="MCCIA Safety Week Proforma API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -135,7 +153,7 @@ def get_invoice(invoice_id: uuid.UUID, p: Principal = Depends(current_principal)
 
 
 @v1.post("/invoices", response_model=InvoiceOut, status_code=201)
-def create_invoice(data: InvoiceCreate, background: BackgroundTasks, branch: str | None = None,
+def create_invoice(data: InvoiceCreate, branch: str | None = None,
                    p: Principal = Depends(current_principal), s: Session = Depends(get_session)):
     try:
         invoice = services.create_invoice(s, p, data, branch)
@@ -143,12 +161,12 @@ def create_invoice(data: InvoiceCreate, background: BackgroundTasks, branch: str
         raise _http(e) from None
     s.commit()
     if invoice.status != "DRAFT":
-        background.add_task(documents.generate_quietly, invoice.id, invoice.version, p)
+        documents.generate_quietly(invoice.id, invoice.version, p)  # inline: serverless hosts may freeze background work
     return invoice
 
 
 @v1.put("/invoices/{invoice_id}", response_model=InvoiceOut)
-def update_invoice(invoice_id: uuid.UUID, data: InvoiceUpdate, background: BackgroundTasks,
+def update_invoice(invoice_id: uuid.UUID, data: InvoiceUpdate,
                    p: Principal = Depends(current_principal), s: Session = Depends(get_session)):
     try:
         invoice = services.update_invoice(s, p, invoice_id, data)
@@ -156,7 +174,7 @@ def update_invoice(invoice_id: uuid.UUID, data: InvoiceUpdate, background: Backg
         raise _http(e) from None
     s.commit()
     if invoice.status != "DRAFT":  # submitted or revised: a new version exists, so it gets its own PDF
-        background.add_task(documents.generate_quietly, invoice.id, invoice.version, p)
+        documents.generate_quietly(invoice.id, invoice.version, p)  # inline: serverless hosts may freeze background work
     return invoice
 
 
@@ -170,19 +188,6 @@ def download_pdf(invoice_id: uuid.UUID, version: int | None = Query(default=None
         raise _http(e) from None
     return Response(data, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
-
-
-@v1.get("/print/{invoice_id}")
-def print_data(invoice_id: uuid.UUID, v: int = Query(ge=1), t: str = Query(min_length=10),
-               s: Session = Depends(get_session), response: Response = None):
-    """Feeds the web app's /print page while Chromium renders the PDF. The short-lived signed
-    token (bound to this invoice + version) is the only credential; it is not a user session."""
-    try:
-        snapshot = documents.snapshot_for_print(s, invoice_id, v, t)
-    except SERVICE_ERRORS as e:
-        raise _http(e) from None
-    response.headers["Cache-Control"] = "no-store"
-    return snapshot
 
 
 @v1.post("/invoices/{invoice_id}/cancel", response_model=InvoiceOut)
@@ -229,10 +234,9 @@ def audit_logs(action: Annotated[str | None, Query(max_length=60, description="p
         raise _http(e) from None
 
 
-# ---- DEV ONLY sign-in (no Supabase account needed while building) ----
-# Registered only when DEV_LOGIN=true AND no Supabase project is configured, so a real
-# deployment (which always sets SUPABASE_URL) can never expose it.
-if settings.dev_login and not settings.supabase_url:
+# ---- DEV ONLY sign-in (no password while building) ----
+# Registered only when DEV_LOGIN=true and ENVIRONMENT is not "production" (production also refuses to start with it on).
+if settings.dev_login and settings.environment != "production":
 
     class DevLogin(BaseModel):
         email: str
@@ -240,10 +244,10 @@ if settings.dev_login and not settings.supabase_url:
     @v1.post("/dev/token")
     def dev_token(body: DevLogin, s: Session = Depends(get_session)):
         user = s.scalar(select(User).where(User.email == body.email, User.active))
-        if user is None or user.auth_user_id is None or not settings.supabase_jwt_secret:
+        if user is None or user.auth_user_id is None or not settings.jwt_secret:
             raise HTTPException(404, "No such dev user")
         claims = {"sub": str(user.auth_user_id), "aud": "authenticated", "exp": int(time.time()) + 8 * 3600}
-        return {"access_token": jwt.encode(claims, settings.supabase_jwt_secret, "HS256")}
+        return {"access_token": jwt.encode(claims, settings.jwt_secret, "HS256")}
 
 
 @v1.get("/settings/invoice")
@@ -255,4 +259,5 @@ def invoice_header(s: Session = Depends(get_session)):
 app.include_router(v1)
 app.include_router(admin.router)
 app.include_router(stock.router)
+app.include_router(login.router)
 app.include_router(exports.router)

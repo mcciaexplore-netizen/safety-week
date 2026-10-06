@@ -14,7 +14,6 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import func, select, text
@@ -22,9 +21,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from . import repositories as repo
+from . import services
 from .auth import Principal, current_principal
-from .config import settings
 from .db import get_session
+from .login import set_password
 from .models import (
     ROLES,
     AppSetting,
@@ -139,7 +139,7 @@ class UserEdit(Strict):
 
 class UserCreate(UserEdit):
     email: EmailStr
-    password: str | None = Field(default=None, min_length=8, max_length=72)
+    password: str = Field(min_length=8, max_length=128)
 
 
 def _user_out(u: User, codes: dict) -> UserAdminOut:
@@ -184,25 +184,26 @@ def edit_user(user_id: uuid.UUID, data: UserEdit, s: Sess, me: Me):
 @router.post("/users", response_model=UserAdminOut, status_code=201)
 def create_user(data: UserCreate, s: Sess):
     branch_id = _branch_of(s, data.role, data.branch_code)
-    if settings.supabase_url and settings.supabase_service_key:
-        if not data.password:
-            raise bad("A password is required to create a login")
-        r = httpx.post(f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users", timeout=20,
-                       headers={"apikey": settings.supabase_service_key,
-                                "Authorization": f"Bearer {settings.supabase_service_key}"},
-                       json={"email": data.email, "password": data.password, "email_confirm": True})
-        if r.status_code >= 300:
-            raise bad("The login service refused this account (already registered?)")
-        auth_id = uuid.UUID(r.json()["id"])
-    elif settings.dev_login:
-        auth_id = uuid.uuid4()  # development only: no external login service
-    else:
-        raise HTTPException(501, "Set SUPABASE_URL and SUPABASE_SERVICE_KEY to create logins")
+    auth_id = uuid.uuid4()  # the `sub` of this user's tokens
     u = User(auth_user_id=auth_id, name=data.name, email=data.email, role=data.role, branch_id=branch_id,
              active=data.active, id=uuid.uuid4())
     s.add(u)
     commit(s)
+    set_password(u.id, data.password)
     return _user_out(u, {b.id: b.code for b in s.scalars(select(Branch))})
+
+
+class PasswordReset(Strict):
+    password: str = Field(min_length=8, max_length=128)
+
+
+@router.put("/users/{user_id}/password", status_code=204)
+def reset_password(user_id: uuid.UUID, data: PasswordReset, s: Sess, me: Me):
+    """Central admin sets a new password for anyone (also clears a lock after too many wrong attempts)."""
+    u = s.get(User, user_id) or _404("user")
+    set_password(u.id, data.password)
+    services.log_event(s, me, "user.password_reset", entity_type="user", entity_id=u.id, branch_id=u.branch_id, email=u.email)
+    s.commit()
 
 
 # ------------------------------------------------------------------ event configuration

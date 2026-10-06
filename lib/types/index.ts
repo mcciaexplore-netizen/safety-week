@@ -1,6 +1,6 @@
 /**
  * Domain types. These mirror the conceptual schema in PLAN.md §15 so the mock
- * services can later be replaced by FastAPI/Supabase without touching the UI.
+ * services can later be replaced by FastAPI without touching the UI.
  */
 
 export type BranchCode = "SBR" | "TIL" | "BHO" | "HAD" | "AHL";

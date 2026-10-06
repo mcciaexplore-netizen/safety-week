@@ -1,16 +1,18 @@
 """Private object storage for generated PDFs. Objects are never public: they are read back
 through the API after the normal authentication + branch checks (no public or signed URLs).
 
-- Production: a PRIVATE Supabase Storage bucket (service-role key, server side only).
+- Production (STORAGE_BACKEND=db): a table in the database (a PDF is only tens of KB, and the host's disk is wiped on deploy).
 - Development / tests: a local directory.
 Paths are built only from UUIDs and integers (see documents.py), never from user input.
 """
 
 from pathlib import Path
 
-import httpx
+from sqlalchemy.dialects.postgresql import insert
 
 from .config import settings
+from .db import SessionLocal
+from .models import StoredFile
 
 
 class LocalStorage:
@@ -32,24 +34,23 @@ class LocalStorage:
         return self._path(key).read_bytes()
 
 
-class SupabaseStorage:
-    def __init__(self):
-        self.base = f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{settings.storage_bucket}"
-        self.headers = {"apikey": settings.supabase_service_key,
-                        "Authorization": f"Bearer {settings.supabase_service_key}"}
+class DbStorage:
+    """PDFs as rows in `stored_files` (production). Uses its own owner connection: the request's RLS role has no
+    access to this table, so a PDF can only be read back through the API's normal authentication + branch checks."""
 
     def put(self, key: str, data: bytes) -> None:
-        r = httpx.post(f"{self.base}/{key}", content=data, timeout=60,
-                       headers={**self.headers, "Content-Type": "application/pdf", "x-upsert": "true"})
-        r.raise_for_status()
+        stmt = insert(StoredFile).values(key=key, data=data)
+        with SessionLocal() as s:
+            s.execute(stmt.on_conflict_do_update(index_elements=[StoredFile.key], set_={"data": data}))
+            s.commit()
 
     def get(self, key: str) -> bytes:
-        r = httpx.get(f"{self.base}/{key}", headers=self.headers, timeout=60)
-        r.raise_for_status()
-        return r.content
+        with SessionLocal() as s:
+            row = s.get(StoredFile, key)
+            if row is None:
+                raise FileNotFoundError(key)
+            return bytes(row.data)
 
 
-def store() -> LocalStorage | SupabaseStorage:
-    if settings.supabase_url and settings.supabase_service_key:
-        return SupabaseStorage()
-    return LocalStorage(settings.storage_dir)
+def store() -> LocalStorage | DbStorage:
+    return DbStorage() if settings.storage_backend == "db" else LocalStorage(settings.storage_dir)

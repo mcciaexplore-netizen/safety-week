@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Save } from "lucide-react";
+import { StockOverview } from "@/components/app/stock-overview";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { API_MODE } from "@/lib/services";
 import { api } from "@/lib/services/api";
 import { cn } from "@/lib/utils";
 
-interface Item { product_id: string; name: string; opening_qty: number | null; low_threshold: number | null; sold: number; remaining: number | null; status: "OK" | "LOW" | "OUT" | "UNSET" }
+interface Item { product_id: string; name: string; opening_qty: number | null; low_threshold: number | null; sold: number; transferred_in: number; transferred_out: number; remaining: number | null; status: "OK" | "LOW" | "OUT" | "UNSET" }
 interface Stock { branch_code: string; branch_name: string; items: Item[] }
 const BRANCHES = [["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]];
 const BADGE: Record<Item["status"], { text: string; cls: string }> = {
@@ -26,6 +27,38 @@ const BADGE: Record<Item["status"], { text: string; cls: string }> = {
 
 export default function StockPage() {
   const { session } = useSession();
+  const [mode, setMode] = useState<"all" | "edit">("all");
+  if (!API_MODE) return <EmptyState title="Available with the live backend" description="Stock is tracked on the server." />;
+  // the central admin sees every branch at once (and can transfer stock); everyone else sees their own branch
+  if (session?.user.role !== "SUPER_ADMIN") return <BranchStock />;
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        title="Stock"
+        description="Every branch's remaining stock side by side, so surplus in one branch can be moved to another that is running out."
+        actions={
+          <div role="tablist" aria-label="Stock view" className="inline-flex rounded-lg border bg-background p-0.5 text-sm">
+            {([["all", "All branches"], ["edit", "Set opening stock"]] as const).map(([k, label]) => (
+              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+                className={cn("rounded-md px-3 py-1", mode === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      />
+      {mode === "all" ? <StockOverview /> : <BranchStock embedded />}
+    </div>
+  );
+}
+
+/** The page header, or just its action buttons when the page already has a header (central admin's edit tab). */
+function Header({ embedded, ...props }: { embedded: boolean; title: string; description: string; actions: React.ReactNode }) {
+  return embedded ? <div className="flex flex-wrap items-center gap-2">{props.actions}</div> : <PageHeader {...props} />;
+}
+
+function BranchStock({ embedded = false }: { embedded?: boolean }) {
+  const { session } = useSession();
   const role = session?.user.role;
   const canEdit = role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
   const [branch, setBranch] = useState("TIL");
@@ -35,8 +68,6 @@ export default function StockPage() {
   const [edits, setEdits] = useState<Record<string, { opening?: string; low?: string }>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-
-  if (!API_MODE) return <EmptyState title="Available with the live backend" description="Stock is tracked on the server." />;
 
   const val = (i: Item, k: "opening" | "low") => edits[i.product_id]?.[k] ?? String((k === "opening" ? i.opening_qty : i.low_threshold) ?? (k === "low" ? "10" : ""));
   const dirty = Object.keys(edits).length > 0;
@@ -61,8 +92,8 @@ export default function StockPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader
+    <div className={cn("space-y-6", !embedded && "mx-auto max-w-5xl")}>
+      <Header embedded={embedded}
         title="Stock"
         description="Enter the opening stock of each material. Remaining stock is worked out automatically from the invoices (drafts and cancelled invoices do not count)."
         actions={
@@ -87,11 +118,11 @@ export default function StockPage() {
       {data.error ? <ErrorState message={data.error.message} onRetry={data.reload} /> : !data.data ? <LoadingRows rows={8} /> : (
         <div className="overflow-x-auto rounded-lg border bg-card">
           <table className="w-full text-sm">
-            <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>Material</th><th className="text-right">Opening stock</th><th className="text-right">Sold</th><th className="text-right">Remaining</th><th className="text-right">Low when at or below</th><th>Status</th></tr></thead>
+            <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>Material</th><th className="text-right">Opening stock</th><th className="text-right">Sold</th><th className="text-right">Moved (in / out)</th><th className="text-right">Remaining</th><th className="text-right">Low when at or below</th><th>Status</th></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-1.5">
               {data.data.items.map((i) => {
                 const opening = val(i, "opening");
-                const remaining = opening.trim() === "" ? null : Number(opening) - i.sold;
+                const remaining = opening.trim() === "" ? null : Number(opening) + i.transferred_in - i.transferred_out - i.sold;
                 const live = remaining === null ? "UNSET" : remaining <= 0 ? "OUT" : remaining <= Number(val(i, "low") || 0) ? "LOW" : "OK";
                 return (
                   <tr key={i.product_id} data-testid="stock-row">
@@ -103,6 +134,7 @@ export default function StockPage() {
                       ) : i.opening_qty ?? "—"}
                     </td>
                     <td className="text-right tabular-nums">{formatNumber(i.sold)}</td>
+                    <td className="text-right tabular-nums text-muted-foreground">{i.transferred_in || i.transferred_out ? `+${i.transferred_in} / -${i.transferred_out}` : "—"}</td>
                     <td className={cn("text-right font-medium tabular-nums", live === "OUT" && "text-red-700")}>{remaining === null ? "—" : formatNumber(remaining)}</td>
                     <td className="text-right">
                       {canEdit ? (
