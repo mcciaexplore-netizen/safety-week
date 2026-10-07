@@ -53,7 +53,7 @@ export function InvoiceAdminPanel({ invoice, onChanged }: { invoice: Invoice; on
   }
 
   return (
-    <section className="space-y-3 rounded-lg border bg-card p-5 print:hidden" aria-label="Admin: version history">
+    <section className="space-y-3 rounded-xl glass shadow-card p-5 print:hidden" aria-label="Admin: version history">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold">Version history</h2>
@@ -127,7 +127,7 @@ export function InvoiceAdminPanel({ invoice, onChanged }: { invoice: Invoice; on
           {old.error ? (
             <ErrorState message={old.error.message} />
           ) : old.data ? (
-            <div className="rounded-md bg-neutral-200 p-2">
+            <div className="rounded-md bg-muted p-2">
               <PaperFrame>
                 <InvoicePaper view={invoiceToView(old.data.inv)} products={old.data.products} />
               </PaperFrame>

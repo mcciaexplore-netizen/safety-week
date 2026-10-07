@@ -34,7 +34,7 @@ export function DailyExcel({ central, branch }: { central: boolean; branch?: str
   const Icon = (b: string) => (busy === b ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <FileSpreadsheet data-icon="inline-start" />);
 
   return (
-    <section className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3" aria-label="Download the day's invoices" data-testid="daily-excel">
+    <section className="flex flex-wrap items-center gap-2 rounded-xl glass shadow-card p-3" aria-label="Download the day's invoices" data-testid="daily-excel">
       <span className="text-sm font-medium">Download one day&apos;s invoices (Excel)</span>
       <Input type="date" value={day} max={todayLocalIso()} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Day to download" className="w-40" />
       {central && branch !== undefined ? (

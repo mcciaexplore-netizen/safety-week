@@ -19,10 +19,10 @@ interface Item { product_id: string; name: string; opening_qty: number | null; l
 interface Stock { branch_code: string; branch_name: string; items: Item[] }
 const BRANCHES = [["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]];
 const BADGE: Record<Item["status"], { text: string; cls: string }> = {
-  OK: { text: "OK", cls: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  LOW: { text: "Low", cls: "border-amber-200 bg-amber-50 text-amber-800" },
-  OUT: { text: "Out", cls: "border-red-200 bg-red-50 text-red-800" },
-  UNSET: { text: "Not set", cls: "border-slate-200 bg-slate-100 text-slate-700" },
+  OK: { text: "OK", cls: "border-success/20 bg-success/10 text-success-fg" },
+  LOW: { text: "Low", cls: "border-warning/20 bg-warning/10 text-warning" },
+  OUT: { text: "Out", cls: "border-danger/20 bg-danger/10 text-danger" },
+  UNSET: { text: "Not set", cls: "border-border bg-muted text-muted-foreground" },
 };
 
 export default function StockPage() {
@@ -116,7 +116,7 @@ function BranchStock({ embedded = false }: { embedded?: boolean }) {
       {msg && <p role="status" className="text-sm">{msg}</p>}
       {!canEdit && <p className="text-sm text-muted-foreground">You can view stock here; a branch admin sets it.</p>}
       {data.error ? <ErrorState message={data.error.message} onRetry={data.reload} /> : !data.data ? <LoadingRows rows={8} /> : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>Material</th><th className="text-right">Opening stock</th><th className="text-right">Sold</th><th className="text-right">Moved (in / out)</th><th className="text-right">Remaining</th><th className="text-right">Low when at or below</th><th>Status</th></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-1.5">
@@ -135,7 +135,7 @@ function BranchStock({ embedded = false }: { embedded?: boolean }) {
                     </td>
                     <td className="text-right tabular-nums">{formatNumber(i.sold)}</td>
                     <td className="text-right tabular-nums text-muted-foreground">{i.transferred_in || i.transferred_out ? `+${i.transferred_in} / -${i.transferred_out}` : "—"}</td>
-                    <td className={cn("text-right font-medium tabular-nums", live === "OUT" && "text-red-700")}>{remaining === null ? "—" : formatNumber(remaining)}</td>
+                    <td className={cn("text-right font-medium tabular-nums", live === "OUT" && "text-danger")}>{remaining === null ? "—" : formatNumber(remaining)}</td>
                     <td className="text-right">
                       {canEdit ? (
                         <Input type="number" min={0} className="ml-auto h-7 w-20 text-right" aria-label={`Low level for ${i.name}`} value={val(i, "low")}

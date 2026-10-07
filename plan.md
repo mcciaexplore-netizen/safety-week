@@ -56,6 +56,8 @@ Do not use the previously discussed branch names such as Sadar or Bhusari. Those
 
 Human-facing branch names and codes should come from the database/configuration layer, not be duplicated throughout UI code.
 
+> **Planned addition (2026-10):** the five branches stay locked, but a sixth, non-physical sales channel — **Online Store, code `ONL`** — is planned (see section 27A and `docs/online-store-plan.md`). It is a `branches` row with `kind = ONLINE`, has no staff users and is managed by the central admin only. Until Phase S1 of that plan is built, "five branches" in this document is still literally true; after S1 code must read the branch list from the API rather than assume five.
+
 ---
 
 # 3. Core Architecture Decision
@@ -1136,6 +1138,20 @@ Owner: create the Supabase project and users (`docs/setup-supabase.md`) - deferr
 
 ---
 
+# 27A. Online Store — Planned Channel
+
+**Status: PLAN APPROVED FOR REVIEW — not built.** Full plan: [`docs/online-store-plan.md`](docs/online-store-plan.md).
+
+**Goal.** A public e-commerce site (own address, e.g. `shop.<domain>`) where anyone can browse the MCCIA safety merchandise, add to cart, pay online and receive a GST tax invoice and delivery, run as a sixth channel (`ONL`) of this system so sales can be compared with the five branch offices. Managed by the central admin only.
+
+**Architecture (decided).** New Next.js storefront in `store/` (own Vercel project and domain) -> the **same FastAPI + Neon database** through a new public router `/api/v1/store/*` with a restricted DB role. Staff app unchanged except an "Online store" section for the central admin. Stock, invoices, audit, reports and Excel exports are reused with `ONL` as a branch.
+
+**Key choices awaiting owner confirmation:** Razorpay for payments; GST-inclusive consumer prices; tax invoice with IGST for out-of-state buyers (accountant to confirm); all-India delivery with manual courier entry first; guest checkout + passwordless e-mail-code sign-in; online has its own stock via the existing Transfer feature and never oversells; no cash on delivery; refunds with credit notes.
+
+**Phases:** S0 decisions/accounts -> S1 channel foundation (`ONL`, IGST, tax-invoice kind) -> S2 catalogue (images, online fields) -> S3 storefront shell -> S4 sign-in and checkout -> S5 payments + automatic invoice + e-mail -> S6 fulfilment screens -> S7 analytics -> S8 hardening -> S9 pilot and launch (about 9-10 weeks of build after S0).
+
+---
+
 # 28. Change Log
 
 ## 2026-09-29
@@ -1288,3 +1304,12 @@ Owner: create the Supabase project and users (`docs/setup-supabase.md`) - deferr
 ## 2026-10-01 — One-command local backend
 
 - `api\start-dev.bat` (or `.venv\Scripts\python start_dev.py`) starts the local PostgreSQL, rewrites `DATABASE_URL` in `api/.env` (its port changes on every start), applies migrations, seeds branches/products/dev users and runs the API on :8000. Fixes the "taking forever / CORS error" symptom, which was simply the API running without its database (the browser reports a hung API as a CORS error). After a forced stop the database may need a minute of crash recovery on the next start.
+
+## 2026-10-06 — Go-live on Vercel + Neon; own sign-in; ReportLab PDFs; theme; online-store plan
+
+- **Hosting:** website `nsw-web` and API `nsw-api` are two Vercel projects; database is Neon (Singapore). Deployed from the CLI; code is on GitHub branch `go-live`. See `docs/deploy.md`.
+- **Auth:** Supabase removed. Own sign-in (`POST /api/v1/auth/login`, argon2 hashes in `user_credentials`, 5-attempt lock, 12 h tokens, change/reset password). First central admins are created with `app.admin_cli`. Migration `0010` (also `stored_files` for PDFs). Dev password-less sign-in only when `DEV_LOGIN=true` and `ENVIRONMENT` is not production; the API refuses to start in production with unsafe settings.
+- **PDFs:** Chromium/Playwright removed. `api/app/pdf.py` draws the one-page A4 invoice with ReportLab from the version snapshot; stored in the database (`STORAGE_BACKEND=db`). Limitation: Latin text only (other scripts print as `?`).
+- **Features since the last entry:** central-admin stock matrix of all branches with digital branch-to-branch transfers (migration `0009`); per-branch buttons on Admin > Invoices; new form layout (customer, materials table, invoice info, summary) with a floating preview and a preview-before-submit step; invoice serial numbers 1-39; new logo (web app only; PDF keeps the old one); "Proforma" spelling everywhere; dev banner hidden on the live site.
+- **Theme:** MCCIA Applied AI Studio theme (tokens in `app/globals.css`, Outfit + Bricolage Grotesque, glass cards, count-up numbers, animated header grid). The printed invoice sheet keeps its workbook colours.
+- **Planned next:** the Online Store channel — see section 27A and `docs/online-store-plan.md`. No code written yet.

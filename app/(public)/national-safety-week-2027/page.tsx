@@ -56,19 +56,19 @@ export default function NationalSafetyWeekPage() {
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-5">
+        <div className="rounded-xl glass shadow-card p-5">
           <CalendarClock className="mb-3 size-5 text-primary" />
           <p className="text-sm text-muted-foreground">Campaign dates</p>
           <p className="text-lg font-semibold">{dates}</p>
           <p className="mt-1 text-xs text-muted-foreground">Set in event configuration once confirmed.</p>
         </div>
-        <div className="rounded-lg border bg-card p-5">
+        <div className="rounded-xl glass shadow-card p-5">
           <Package className="mb-3 size-5 text-primary" />
           <p className="text-sm text-muted-foreground">Material catalogue</p>
           <p className="text-lg font-semibold">{PRODUCTS.length} invoice line items</p>
           <p className="mt-1 text-xs text-muted-foreground">2027 rates are configured before launch.</p>
         </div>
-        <div className="rounded-lg border bg-card p-5">
+        <div className="rounded-xl glass shadow-card p-5">
           <Percent className="mb-3 size-5 text-primary" />
           <p className="text-sm text-muted-foreground">Tax</p>
           <p className="text-lg font-semibold">CGST + SGST</p>
@@ -80,7 +80,7 @@ export default function NationalSafetyWeekPage() {
         <h2 className="text-xl font-semibold">How it works</h2>
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="rounded-lg border bg-card p-5">
+            <li key={s.title} className="rounded-xl glass shadow-card p-5">
               <span className="mb-3 flex size-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                 {i + 1}
               </span>

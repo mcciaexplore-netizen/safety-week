@@ -117,7 +117,7 @@ export default function InvoicesPage() {
           }
         />
       ) : (
-        <div className={`rounded-lg border bg-card transition-opacity ${list.loading ? "opacity-60" : ""}`}>
+        <div className={`rounded-xl glass shadow-card transition-opacity ${list.loading ? "opacity-60" : ""}`}>
           <Table>
             <TableHeader>
               <TableRow className="bg-secondary/60 hover:bg-secondary/60">

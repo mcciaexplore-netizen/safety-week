@@ -46,7 +46,7 @@ export default function AdminInvoices() {
         <select className={SEL} aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{s || "All statuses"}</option>)}</select>
       </div>
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : !list.data ? <LoadingRows rows={8} /> : list.data.length === 0 ? <EmptyState title="No invoices match" /> : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>Invoice ID</th><th>Date</th><th>Company</th><th className="text-right">Total</th><th>Status</th><th>Created by</th><th>Updated</th><th /></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">

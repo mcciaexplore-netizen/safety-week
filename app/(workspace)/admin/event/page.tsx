@@ -36,7 +36,7 @@ export default function EventPage() {
     <>
       <PageHeader title="Event configuration" description="The campaign year, dates and invoice numbering, plus the header and footer printed on every invoice." />
       {events.error ? <ErrorState message={events.error.message} onRetry={events.reload} /> : !e ? <LoadingRows rows={4} /> : (
-        <section className="space-y-3 rounded-lg border bg-card p-5" aria-label="Event">
+        <section className="space-y-3 rounded-xl glass shadow-card p-5" aria-label="Event">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">{e.name} {e.year} <Badge variant="outline" className="ml-2">{e.status}</Badge></h2>
@@ -54,7 +54,7 @@ export default function EventPage() {
       )}
 
       {header.error ? <ErrorState message={header.error.message} onRetry={header.reload} /> : !header.data ? null : (
-        <section className="space-y-3 rounded-lg border bg-card p-5" aria-label="Invoice header and footer">
+        <section className="space-y-3 rounded-xl glass shadow-card p-5" aria-label="Invoice header and footer">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Invoice header and footer</h2>

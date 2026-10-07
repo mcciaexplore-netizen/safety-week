@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FilePlus2, FileText, IndianRupee, Package, PencilLine } from "lucide-react";
+import { CountUp } from "@/components/app/count-up";
+import { GridBackdrop } from "@/components/app/grid-backdrop";
 import { LowStockCard } from "@/components/app/low-stock-card";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
@@ -20,10 +22,10 @@ export default function DashboardPage() {
 
   const kpis = s
     ? [
-        { label: "Invoices (active)", value: formatNumber(s.invoiceCount), sub: `${s.submittedCount} submitted`, icon: FileText },
-        { label: "Invoice value", value: formatRupeesShort(s.totalValue), sub: `Avg ${formatRupeesShort(s.averageValue)} per invoice`, icon: IndianRupee },
-        { label: "Drafts pending", value: formatNumber(s.draftCount), sub: "Finish and submit", icon: PencilLine },
-        { label: "Units ordered", value: formatNumber(s.unitsSold), sub: "Across all materials", icon: Package },
+        { label: "Invoices (active)", n: s.invoiceCount, fmt: formatNumber, sub: `${s.submittedCount} submitted`, icon: FileText },
+        { label: "Invoice value", n: s.totalValue, fmt: formatRupeesShort, sub: `Avg ${formatRupeesShort(s.averageValue)} per invoice`, icon: IndianRupee },
+        { label: "Drafts pending", n: s.draftCount, fmt: formatNumber, sub: "Finish and submit", icon: PencilLine },
+        { label: "Units ordered", n: s.unitsSold, fmt: formatNumber, sub: "Across all materials", icon: Package },
       ]
     : [];
   const maxMonthly = Math.max(1, ...(s?.monthly.map((m) => m.value) ?? [1]));
@@ -31,7 +33,9 @@ export default function DashboardPage() {
   const totalStatus = Math.max(1, s?.statusBreakdown.reduce((a, b) => a + b.count, 0) ?? 1);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="reveal mx-auto max-w-6xl space-y-6">
+      <div className="relative py-4">
+        <GridBackdrop />
       <PageHeader
         eyebrow={session ? `${session.branch.name} branch` : undefined}
         title="Dashboard"
@@ -48,6 +52,7 @@ export default function DashboardPage() {
           </>
         }
       />
+      </div>
 
       {summary.error && (
         <ErrorState
@@ -60,16 +65,16 @@ export default function DashboardPage() {
       <section aria-label="Key figures" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {!s && !summary.error
           ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
-          : kpis.map(({ label, value, sub, icon: Icon }) => (
-              <div key={label} className="rounded-lg border bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                  <span className="flex size-8 items-center justify-center rounded-md bg-secondary text-primary">
-                    <Icon className="size-4" />
-                  </span>
-                </div>
-                <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
-                <p className="text-xs text-muted-foreground">{sub}</p>
+          : kpis.map(({ label, n, fmt, sub, icon: Icon }) => (
+              <div key={label} className="card-lift rounded-xl glass shadow-card p-6 text-center">
+                <span className="icon-tile mx-auto">
+                  <Icon className="size-[18px]" />
+                </span>
+                <p className="big-number mt-4">
+                  <CountUp value={n} format={fmt} />
+                </p>
+                <p className="label-xs mt-2">{label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
               </div>
             ))}
       </section>
@@ -77,7 +82,7 @@ export default function DashboardPage() {
       {s && (
         <>
           <section className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-lg border bg-card p-5 lg:col-span-2">
+            <div className="rounded-xl glass shadow-card p-5 lg:col-span-2">
               <h2 className="mb-4 font-medium">Invoice value by month</h2>
               {s.monthly.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No invoices yet.</p>
@@ -87,7 +92,7 @@ export default function DashboardPage() {
                     <div key={m.label} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
                       <span className="text-xs font-medium">{formatRupeesShort(m.value)}</span>
                       <div
-                        className="w-full max-w-20 rounded-t bg-primary"
+                        className="w-full max-w-20 rounded-t bg-brand-gradient"
                         style={{ height: `${Math.max(4, (m.value / maxMonthly) * 70)}%` }}
                         role="img"
                         aria-label={`${m.label}: ${formatRupeesShort(m.value)}`}
@@ -98,7 +103,7 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            <div className="rounded-lg border bg-card p-5">
+            <div className="rounded-xl glass shadow-card p-5">
               <h2 className="mb-4 font-medium">Status breakdown</h2>
               <ul className="space-y-3">
                 {s.statusBreakdown.map((b) => (
@@ -120,7 +125,7 @@ export default function DashboardPage() {
           </section>
 
           <section className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-lg border bg-card p-5">
+            <div className="rounded-xl glass shadow-card p-5">
               <h2 className="mb-4 font-medium">Top materials (basic value)</h2>
               {s.topProducts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No items ordered yet.</p>

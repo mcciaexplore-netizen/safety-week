@@ -37,7 +37,7 @@ export default function LandingPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-accent">
               {ORGANISATION.name}
             </p>
-            <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            <h1 className="text-[clamp(2rem,5vw,4.2rem)] font-extrabold leading-[1.1] tracking-[-0.03em]">
               National Safety Week {EVENT.year}
               <span className="block text-2xl font-normal text-sidebar-foreground/80 sm:text-3xl">
                 Proforma Invoice System
@@ -52,7 +52,7 @@ export default function LandingPage() {
                 href="/national-safety-week-2027"
                 className={cn(
                   buttonVariants({ size: "lg" }),
-                  "h-11 bg-brand-accent px-5 text-base text-sidebar-primary-foreground hover:bg-brand-accent/90",
+                  "h-11 px-6 text-base",
                 )}
               >
                 National Safety Week {EVENT.year}
@@ -62,7 +62,7 @@ export default function LandingPage() {
                 href="/select-branch"
                 className={cn(
                   buttonVariants({ variant: "outline", size: "lg" }),
-                  "h-11 border-sidebar-border bg-transparent px-5 text-base text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "h-11 px-6 text-base",
                 )}
               >
                 Go straight to branch sign-in
@@ -88,12 +88,12 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <h2 className="mb-8 text-xl font-semibold">What you can do here</h2>
+        <h2 className="mb-8 text-[clamp(1.9rem,3.5vw,2.5rem)] font-bold">What you can do here</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-lg border bg-card p-5">
-              <span className="mb-3 flex size-9 items-center justify-center rounded-md bg-secondary text-primary">
-                <Icon className="size-5" />
+            <div key={title} className="card-lift rounded-xl glass shadow-card p-6">
+              <span className="icon-tile mb-4">
+                <Icon className="size-[18px]" />
               </span>
               <h3 className="mb-1 font-medium">{title}</h3>
               <p className="text-sm text-muted-foreground">{text}</p>

@@ -138,7 +138,7 @@ export function InvoiceWorkspace({
             </div>
             <p className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
               <span className="font-mono">{draft.invoiceNumber}</span>
-              <span data-testid="save-state" className={cn(dirty && "text-amber-700")}>
+              <span data-testid="save-state" className={cn(dirty && "text-warning")}>
                 {saving
                   ? "Saving…"
                   : dirty
@@ -250,7 +250,7 @@ export function InvoiceWorkspace({
                 : "A live view of the invoice as filled in so far. Nothing is saved by looking at it."}
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 overflow-y-auto rounded-md bg-neutral-200 p-2 sm:p-4">
+          <div className="min-h-0 overflow-y-auto rounded-md bg-muted p-2 sm:p-4">
             <div className="print-area">
               <PaperFrame maxScale={1.35}>
                 <InvoicePaper view={view} products={products} showFullCatalogue />
@@ -305,7 +305,7 @@ export function InvoiceWorkspace({
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="size-5 text-emerald-600" />
+              <CheckCircle2 className="size-5 text-success-fg" />
               {submitted?.version && submitted.version > 1 ? "Revision saved" : "Invoice submitted"}
             </DialogTitle>
             <DialogDescription>

@@ -46,13 +46,13 @@ export default function DiscountsPage() {
       <section className="space-y-3" aria-label="Discount rules">
         <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Discount rules</h2><Button onClick={() => setRule("new")}><Plus data-icon="inline-start" />Add rule</Button></div>
         {rules.error ? <ErrorState message={rules.error.message} onRetry={rules.reload} /> : !rules.data ? <LoadingRows rows={2} /> : rules.data.length === 0 ? <EmptyState title="No discount rules yet" /> : (
-          <div className="overflow-x-auto rounded-lg border bg-card"><table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl glass shadow-card"><table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>Name</th><th>Discount</th><th>From order value</th><th>Valid</th><th>Status</th><th /></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">
               {rules.data.map((x) => (
                 <tr key={x.id} data-testid="rule-row"><td className="font-medium">{x.name}</td>
                   <td>{x.percentage ? `${Number(x.percentage)}%` : `₹${formatMoney(Number(x.fixed_amount))}`}</td><td>{x.threshold ? `₹${formatMoney(Number(x.threshold))}` : "—"}</td>
-                  <td>{x.valid_from ?? "…"} to {x.valid_until ?? "…"}</td><td>{x.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-slate-100">Off</Badge>}</td>
+                  <td>{x.valid_from ?? "…"} to {x.valid_until ?? "…"}</td><td>{x.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-muted">Off</Badge>}</td>
                   <td><div className="flex justify-end gap-1.5"><Button variant="outline" size="icon-sm" aria-label={`Edit ${x.name}`} onClick={() => setRule(x)}><Pencil /></Button>
                     <Button variant="outline" size="icon-sm" aria-label={`Delete ${x.name}`} onClick={() => remove(`/admin/discount-rules/${x.id}`, rules.reload, `the rule “${x.name}”`)}><Trash2 /></Button></div></td></tr>
               ))}
@@ -65,7 +65,7 @@ export default function DiscountsPage() {
         {pkgs.error ? <ErrorState message={pkgs.error.message} onRetry={pkgs.reload} /> : !pkgs.data ? <LoadingRows rows={2} /> : pkgs.data.length === 0 ? <EmptyState title="No packages yet" /> : (
           <div className="grid gap-3 md:grid-cols-2">
             {pkgs.data.map((x) => (
-              <div key={x.id} data-testid="package-card" className="space-y-2 rounded-lg border bg-card p-4">
+              <div key={x.id} data-testid="package-card" className="space-y-2 rounded-xl glass shadow-card p-4">
                 <div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{x.name} {!x.active && <span className="text-xs font-normal text-muted-foreground">(off)</span>}</p>
                   <p className="text-sm text-muted-foreground">{x.description}</p></div>
                   <div className="flex gap-1.5"><Button variant="outline" size="icon-sm" aria-label={`Edit ${x.name}`} onClick={() => setPkg(x)}><Pencil /></Button>

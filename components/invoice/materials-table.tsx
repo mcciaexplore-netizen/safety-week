@@ -57,7 +57,7 @@ export function MaterialsTable({
               const qty = l?.quantity ?? 0;
               const name = clean(p.name);
               return (
-                <tr key={p.id} data-testid="material-row" className={cn(qty > 0 && "bg-emerald-50/60")}>
+                <tr key={p.id} data-testid="material-row" className={cn(qty > 0 && "bg-success/10")}>
                   <td className="text-muted-foreground tabular-nums">{idx + 1}</td>
                   <td className="font-medium">{name}</td>
                   <td className="font-mono text-sm text-muted-foreground">{p.hsnCode}</td>
@@ -70,7 +70,7 @@ export function MaterialsTable({
                         value={l!.rate}
                         aria-label={`Rate for ${name}`}
                         onChange={(e) => onRate(p.id, Math.max(0, Number(e.target.value) || 0))}
-                        className="ml-auto w-28 border-amber-400 bg-amber-50 text-right"
+                        className="ml-auto w-28 border-warning/50 bg-warning/10 text-right"
                       />
                     ) : (
                       formatMoney(l?.rate ?? p.currentRate)
@@ -88,7 +88,7 @@ export function MaterialsTable({
                       aria-label={`Quantity for ${name}`}
                       data-testid="qty-input"
                       onChange={(e) => onQty(p.id, Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                      className={cn("mx-auto w-24 text-center tabular-nums", qty > 0 && "border-emerald-500 font-semibold")}
+                      className={cn("mx-auto w-24 text-center tabular-nums", qty > 0 && "border-success/50 font-semibold")}
                     />
                   </td>
                   <td className="text-right tabular-nums text-muted-foreground">{p.gstHalfRate * 2}%</td>

@@ -77,7 +77,7 @@ export default function AuditLogPage() {
       ) : list.data.length === 0 ? (
         <EmptyState title="Nothing recorded yet" />
       ) : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left">
               <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">

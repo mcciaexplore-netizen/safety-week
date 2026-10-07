@@ -65,10 +65,10 @@ export function PaymentSection({
 
   const badge =
     status === "PAID"
-      ? { text: "Paid in full", cls: "bg-emerald-100 text-emerald-900" }
+      ? { text: "Paid in full", cls: "bg-success/10 text-success-fg" }
       : status === "PARTIAL"
-        ? { text: `Part payment — balance due ${formatRupees(balance)}`, cls: "bg-amber-100 text-amber-900" }
-        : { text: "Not paid yet", cls: "bg-slate-100 text-slate-700" };
+        ? { text: `Part payment — balance due ${formatRupees(balance)}`, cls: "bg-warning/10 text-warning" }
+        : { text: "Not paid yet", cls: "bg-muted text-muted-foreground" };
 
   return (
     <div className="space-y-3 rounded-md border p-3" data-testid="payment-section">
@@ -189,7 +189,7 @@ export function PaymentSection({
             <p className="text-base tabular-nums" data-testid="payment-summary">
               Paid <strong>{formatRupees(paid)}</strong> of {formatRupees(payable)}
               {" · "}
-              <span className={cn(balance < 0 ? "text-destructive" : balance > 0 ? "text-amber-700" : "text-emerald-700")}>
+              <span className={cn(balance < 0 ? "text-destructive" : balance > 0 ? "text-warning" : "text-success-fg")}>
                 {balance < 0 ? `over by ${formatRupees(-balance)}` : `balance ${formatRupees(balance)}`}
               </span>
             </p>

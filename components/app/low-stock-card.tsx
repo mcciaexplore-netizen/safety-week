@@ -25,7 +25,7 @@ export function LowStockCard() {
   const low = useAsync(() => (API_MODE ? api<Low>("/stock/low?limit=8") : Promise.resolve(null)), `low-stock:${session?.user.id}`);
 
   return (
-    <div className="rounded-lg border bg-card lg:col-span-2" data-testid="low-stock-card">
+    <div className="rounded-xl glass shadow-card lg:col-span-2" data-testid="low-stock-card">
       <div className="flex items-center justify-between border-b px-5 py-3">
         <h2 className="flex items-center gap-2 font-medium">
           <PackageSearch className="size-4 text-muted-foreground" />
@@ -54,7 +54,7 @@ export function LowStockCard() {
             )}
           </p>
         ) : low.data.items.length === 0 ? (
-          <p className="text-sm text-emerald-700">All {low.data.configured} tracked materials are well stocked.</p>
+          <p className="text-sm text-success-fg">All {low.data.configured} tracked materials are well stocked.</p>
         ) : (
           <ul className="divide-y">
             {low.data.items.map((i) => (
@@ -66,7 +66,7 @@ export function LowStockCard() {
                   </span>
                   <Badge
                     variant="outline"
-                    className={cn(i.status === "OUT" ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800")}
+                    className={cn(i.status === "OUT" ? "border-danger/20 bg-danger/10 text-danger" : "border-warning/20 bg-warning/10 text-warning")}
                   >
                     {i.status === "OUT" ? "Out" : "Low"}
                   </Badge>

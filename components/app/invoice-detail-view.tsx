@@ -81,7 +81,7 @@ export function InvoiceDetailView({ id }: { id: string }) {
             />
           </div>
           {isAdmin && <InvoiceAdminPanel invoice={inv} onChanged={data.reload} />}
-          <div className="print-area rounded-md bg-neutral-200 p-2 sm:p-4 print:bg-transparent print:p-0">
+          <div className="print-area rounded-md bg-muted p-2 sm:p-4 print:bg-transparent print:p-0">
             <PaperFrame>
               <InvoicePaper view={invoiceToView(inv)} products={data.data.products} />
             </PaperFrame>

@@ -20,14 +20,14 @@ export default function BranchesPage() {
     <>
       <PageHeader title="Branches" description="The five MCCIA branches are fixed. You can update their contact details or switch one off." />
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : !list.data ? <LoadingRows rows={5} /> : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-4 [&>th]:py-2 [&>th]:font-medium"><th>Code</th><th>Branch</th><th>Address</th><th>Phone</th><th>E-mail</th><th>Status</th><th /></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-4 [&_td]:py-2.5">
               {list.data.map((b) => (
                 <tr key={b.id} data-testid="branch-row">
                   <td className="font-mono">{b.code}</td><td className="font-medium">{b.name}</td><td>{b.address || "—"}</td><td>{b.phone || "—"}</td><td>{b.email || "—"}</td>
-                  <td>{b.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-slate-100">Inactive</Badge>}</td>
+                  <td>{b.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-muted">Inactive</Badge>}</td>
                   <td className="text-right"><Button variant="outline" size="icon-sm" aria-label={`Edit ${b.name}`} onClick={() => setEditing(b)}><Pencil /></Button></td>
                 </tr>
               ))}

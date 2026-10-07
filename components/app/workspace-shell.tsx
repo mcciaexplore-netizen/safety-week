@@ -107,7 +107,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   const renderSidebar = (compact: boolean) => (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className={cn("space-y-4 border-b border-sidebar-border", compact ? "p-2" : "p-4")}>
-        <Link href="/dashboard" onClick={() => setOpen(false)} className="block w-fit rounded bg-white p-2" title="Dashboard">
+        <Link href="/dashboard" onClick={() => setOpen(false)} className="block w-fit rounded-md" title="Dashboard">
           <MCCIALogo height={compact ? 14 : 24} className={compact ? "max-w-10" : undefined} />
         </Link>
         {compact ? (
@@ -129,7 +129,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             aria-current={isActive(pathname, href) ? "page" : undefined}
             title={compact ? label : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent",
+              "flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-all duration-300 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               compact ? "justify-center px-0" : "px-3",
               isActive(pathname, href) && "bg-sidebar-accent text-sidebar-accent-foreground border-l-3 border-brand-accent",
             )}
@@ -187,7 +187,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-white/95 px-4 backdrop-blur-xl sm:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -234,11 +234,11 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         </header>
         {/* only on a developer's machine (dev sign-in) or in the browser-only demo; never on the live site */}
         {!REAL_AUTH && (
-          <div className="border-b bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-900 sm:px-6">
+          <div className="border-b bg-warning/10 px-4 py-1.5 text-center text-xs text-warning sm:px-6">
             {API_MODE ? "Development build — connected to the local API." : "Demo mode — sample data stored in this browser only."}
           </div>
         )}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="reveal flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

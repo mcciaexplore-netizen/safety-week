@@ -20,10 +20,10 @@ interface Transfer { id: string; created_at: string; product: string; from_branc
 interface Draft { product_id: string; from: string; to: string }
 
 const TONE: Record<Status, string> = {
-  OK: "bg-emerald-50 text-emerald-900",
-  LOW: "bg-amber-50 text-amber-900",
-  OUT: "bg-red-50 text-red-800",
-  UNSET: "bg-slate-50 text-slate-500",
+  OK: "bg-success/10 text-success-fg",
+  LOW: "bg-warning/10 text-warning",
+  OUT: "bg-danger/10 text-danger",
+  UNSET: "bg-muted text-muted-foreground",
 };
 const LEGEND: [Status, string][] = [["OK", "OK"], ["LOW", "Low"], ["OUT", "Out"], ["UNSET", "Not set"]];
 const SELECT_CLS = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -72,7 +72,7 @@ export function StockOverview() {
       </div>
       {msg && <p role="status" className="text-sm">{msg}</p>}
 
-      <div className="overflow-x-auto rounded-lg border bg-card">
+      <div className="overflow-x-auto rounded-xl glass shadow-card">
         <table className="w-full text-sm">
           <thead className="bg-secondary/60 text-left">
             <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
@@ -125,7 +125,7 @@ export function StockOverview() {
         {history.data && history.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">No transfers yet.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <div className="overflow-x-auto rounded-xl glass shadow-card">
             <table className="w-full text-sm">
               <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>When</th><th>Material</th><th>Move</th><th className="text-right">Qty</th><th>By</th><th>Note</th></tr></thead>
               <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-1.5">

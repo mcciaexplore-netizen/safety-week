@@ -35,14 +35,14 @@ export default function UsersPage() {
       <PageHeader title="Users" description="Who can sign in, their role and their branch. Role and branch changes are recorded in the audit log."
         actions={<Button onClick={() => setEditing("new")}><UserPlus data-icon="inline-start" />Add user</Button>} />
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : !list.data ? <LoadingRows rows={6} /> : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-4 [&>th]:py-2 [&>th]:font-medium"><th>Name</th><th>E-mail</th><th>Role</th><th>Branch</th><th>Status</th><th /></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-4 [&_td]:py-2.5">
               {list.data.map((u) => (
                 <tr key={u.id} data-testid="user-row">
                   <td className="font-medium">{u.name}</td><td>{u.email}</td><td>{ROLES.find((r) => r[0] === u.role)?.[1] ?? u.role}</td><td>{u.branch_code ?? "All"}</td>
-                  <td>{u.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-slate-100">Inactive</Badge>}</td>
+                  <td>{u.active ? <Badge variant="outline">Active</Badge> : <Badge variant="outline" className="bg-muted">Inactive</Badge>}</td>
                   <td className="text-right"><div className="flex justify-end gap-1.5">
                     <Button variant="outline" size="icon-sm" aria-label={`Reset password for ${u.name}`} title="Reset password" onClick={() => setResetting(u)}><KeyRound /></Button>
                     <Button variant="outline" size="icon-sm" aria-label={`Edit ${u.name}`} onClick={() => setEditing(u)}><Pencil /></Button>

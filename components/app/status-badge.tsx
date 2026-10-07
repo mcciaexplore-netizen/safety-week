@@ -4,11 +4,11 @@ import type { Invoice, InvoiceStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const STYLES: Record<InvoiceStatus, { label: string; className: string }> = {
-  DRAFT: { label: "Draft", className: "bg-amber-100 text-amber-900 border-amber-200" },
-  SUBMITTED: { label: "Submitted", className: "bg-blue-100 text-blue-900 border-blue-200" },
-  GENERATED: { label: "PDF generated", className: "bg-emerald-100 text-emerald-900 border-emerald-200" },
-  EDITED: { label: "Edited", className: "bg-violet-100 text-violet-900 border-violet-200" },
-  CANCELLED: { label: "Cancelled", className: "bg-slate-200 text-slate-700 border-slate-300" },
+  DRAFT: { label: "Draft", className: "bg-warning/10 text-warning border-warning/20" },
+  SUBMITTED: { label: "Submitted", className: "bg-brand/10 text-brand border-brand/20" },
+  GENERATED: { label: "PDF generated", className: "bg-success/10 text-success-fg border-success/20" },
+  EDITED: { label: "Edited", className: "bg-violet/10 text-violet border-violet/20" },
+  CANCELLED: { label: "Cancelled", className: "bg-muted text-muted-foreground border-border" },
 };
 
 export const STATUS_LABEL = (s: InvoiceStatus) => STYLES[s].label;
@@ -28,10 +28,10 @@ export function PaymentBadge({ invoice }: { invoice: Pick<Invoice, "status" | "p
   const s = summarizePayments(invoice.payments ?? [], invoice.totals.roundedTotal);
   const style =
     s.status === "PAID"
-      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+      ? "bg-success/10 text-success-fg border-success/20"
       : s.status === "PARTIAL"
-        ? "bg-amber-50 text-amber-800 border-amber-200"
-        : "bg-slate-100 text-slate-700 border-slate-200";
+        ? "bg-warning/10 text-warning border-warning/20"
+        : "bg-muted text-muted-foreground border-border";
   const modes = [...new Set((invoice.payments ?? []).map((p) => p.mode))].join(" + ");
   return (
     <Badge variant="outline" className={cn("font-medium", style)} title={modes || "No payment recorded"}>

@@ -47,7 +47,7 @@ export default function ProductsPage() {
         actions={<><Button variant="outline" disabled={pending === 0} onClick={() => setConfirmAll(true)}><CheckCheck data-icon="inline-start" />Confirm all {pending} pending</Button>
           <Button onClick={() => setEditing("new")}><Plus data-icon="inline-start" />Add product</Button></>} />
       {pending > 0 && (
-        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <p role="status" className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-sm text-warning">
           {pending} rate(s) are still the <strong>2026 reference values</strong> from the workbook. They are shown to branches as-is until you edit or confirm each one; the event cannot be opened before that.
         </p>
       )}
@@ -56,7 +56,7 @@ export default function ProductsPage() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} />Only unconfirmed rates</label>
       </div>
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : !list.data ? <LoadingRows rows={8} /> : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>#</th><th>Particulars</th><th>HSN</th><th className="text-right">Rate</th><th className="text-right">CGST+SGST</th><th>Rate status</th><th /></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">
@@ -64,7 +64,7 @@ export default function ProductsPage() {
                 <tr key={x.id} data-testid="product-row" className={x.active ? "" : "opacity-60"}>
                   <td className="text-muted-foreground">{x.line_order}</td><td className="font-medium">{x.name.replace(/\s+/g, " ")}{!x.active && <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>}</td>
                   <td className="font-mono">{x.hsn_code}</td><td className="text-right tabular-nums">{formatMoney(Number(x.current_rate))}</td><td className="text-right">{Number(x.cgst_rate)}% + {Number(x.sgst_rate)}%</td>
-                  <td>{x.rate_confirmed ? <Badge variant="outline" className="bg-emerald-50 text-emerald-800">Confirmed</Badge> : <Badge variant="outline" className="bg-amber-50 text-amber-800">2026 reference</Badge>}</td>
+                  <td>{x.rate_confirmed ? <Badge variant="outline" className="bg-success/10 text-success-fg">Confirmed</Badge> : <Badge variant="outline" className="bg-warning/10 text-warning">2026 reference</Badge>}</td>
                   <td className="text-right"><Button variant="outline" size="icon-sm" aria-label={`Edit ${x.name}`} onClick={() => setEditing(x)}><Pencil /></Button></td>
                 </tr>
               ))}

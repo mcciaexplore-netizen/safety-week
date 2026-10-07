@@ -57,14 +57,14 @@ export function LoginForm({ branchCode }: { branchCode: string }) {
           Sign in to prepare and track Proforma Invoices for National Safety Week 2027. Your workspace
           only shows invoices that belong to your branch.
         </p>
-        {!REAL_AUTH && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        {!REAL_AUTH && <p className="rounded-md border border-warning/20 bg-warning/10 p-3 text-sm text-warning">
           {API_MODE
             ? "Development sign-in: any password works. Invoices are saved in the local API database."
             : "Demo mode: sign-in is simulated. Any password of 4+ characters works and no data leaves your browser."}
         </p>}
       </div>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-xl glass shadow-card p-6">
         {branch.loading && !branch.data && <LoadingRows rows={4} />}
         {branch.error && (
           <ErrorState message={branch.error.message} onRetry={branch.reload} />

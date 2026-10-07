@@ -23,7 +23,7 @@ interface Report {
 
 function Table({ title, head, rows }: { title: string; head: string[]; rows: (string | number)[][] }) {
   return (
-    <section className="rounded-lg border bg-card" aria-label={title}>
+    <section className="rounded-xl glass shadow-card" aria-label={title}>
       <h2 className="border-b px-4 py-3 font-medium">{title}</h2>
       <div className="overflow-x-auto"><table className="w-full text-sm">
         <thead className="text-left text-muted-foreground"><tr className="[&>th]:px-4 [&>th]:py-2 [&>th]:font-medium">{head.map((h, i) => <th key={h} className={i ? "text-right" : ""}>{h}</th>)}</tr></thead>

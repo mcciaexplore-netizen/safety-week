@@ -27,7 +27,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-5 rounded-xl border bg-card p-6 text-base sm:p-8 [&_input]:h-10 [&_input]:text-base [&_label]:text-base [&_select]:h-10 [&_select]:text-base [&_textarea]:text-base [&_.text-xs]:text-sm">
+    <section className="space-y-5 rounded-xl glass shadow-card p-6 text-base sm:p-8 [&_input]:h-10 [&_input]:text-base [&_label]:text-base [&_select]:h-10 [&_select]:text-base [&_textarea]:text-base [&_.text-xs]:text-sm">
       <div>
         <h2 className="text-xl font-semibold">{title}</h2>
         {hint && <p className="text-sm text-muted-foreground">{hint}</p>}

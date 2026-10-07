@@ -42,7 +42,7 @@ export default function AdminOverview() {
       {warnings.length > 0 && (
         <div className="space-y-2" role="region" aria-label="Needs attention">
           {warnings.map((w) => (
-            <div key={w.text} className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div key={w.text} className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/20 bg-warning/10 p-3 text-sm text-warning">
               <AlertTriangle className="size-4 shrink-0" />
               <span className="flex-1">{w.text}</span>
               <Link href={w.href} className="font-medium underline">{w.cta}</Link>
@@ -52,14 +52,14 @@ export default function AdminOverview() {
       )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(({ label, value, icon: Icon, sub }) => (
-          <div key={label} className="rounded-lg border bg-card p-5">
+          <div key={label} className="rounded-xl glass shadow-card p-5">
             <div className="flex items-center justify-between text-sm text-muted-foreground">{label}<Icon className="size-4" /></div>
             <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
             <p className="text-xs text-muted-foreground">{sub}</p>
           </div>
         ))}
       </div>
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-xl glass shadow-card">
         <h2 className="border-b px-5 py-3 font-medium">By branch</h2>
         <table className="w-full text-sm">
           <thead className="text-left text-muted-foreground"><tr className="[&>th]:px-5 [&>th]:py-2 [&>th]:font-medium"><th>Branch</th><th className="text-right">Invoices</th><th className="text-right">Value</th></tr></thead>

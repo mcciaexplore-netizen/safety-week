@@ -59,7 +59,7 @@ export default function SelectBranchPage() {
             <li key={b.id}>
               <Link
                 href={`/login?branch=${b.code}`}
-                className="group flex h-full items-center justify-between gap-4 rounded-lg border bg-card p-5 transition-colors hover:border-primary hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                className="group flex h-full items-center justify-between gap-4 rounded-xl glass shadow-card p-5 card-lift focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <div className="space-y-1">
                   <p className="text-lg font-semibold">{b.name}</p>
