@@ -1,9 +1,8 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CreditCard, MapPin, PackageCheck, ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,12 +10,6 @@ import { BranchSelect, PriceBlock, ProductImage, ProductLink, StockLine } from "
 import { storeActions, useCatalogue, useStore, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
-const STEPS = [
-  { icon: ShoppingCart, title: "1. Choose", text: "Browse and add what you need to the cart." },
-  { icon: MapPin, title: "2. Pick a branch", text: "Choose which of our five MCCIA branches you will collect from — you see its stock live." },
-  { icon: CreditCard, title: "3. Pay your way", text: "Pay online, or simply pay at the branch counter when you collect." },
-  { icon: PackageCheck, title: "4. Collect", text: "We pack it and e-mail you. Show your invoice and take it home." },
-];
 
 function Shop() {
   const params = useSearchParams();
@@ -39,30 +32,7 @@ function Shop() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b bg-brand-gradient text-white">
-        <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.25),transparent_70%)]" />
-        <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 md:py-20">
-          <p className="label-xs !text-white/70">National Safety Week {data?.year ?? 2027}</p>
-          <h1 className="mt-3 max-w-2xl text-[clamp(2rem,5vw,3.6rem)] leading-[1.08] font-extrabold !text-white">Safety merchandise, ready for you to collect.</h1>
-          <p className="mt-4 max-w-xl text-base text-white/80">Order online from MCCIA, pick it up from the branch that suits you, and pay online or at the counter. No delivery charges, no waiting for couriers.</p>
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <a href="#products"><Button size="lg" className="!bg-white !bg-none !text-primary">Shop now</Button></a>
-            <Link href="/store/help" className="text-sm font-semibold text-white/90 underline-offset-4 hover:underline">How pick-up works</Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-6xl gap-4 px-4 py-8 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-        {STEPS.map(({ icon: Icon, title, text }) => (
-          <div key={title} className="glass rounded-xl p-5">
-            <span className="icon-tile mb-3"><Icon className="size-[18px]" /></span>
-            <p className="font-heading font-bold">{title}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-          </div>
-        ))}
-      </section>
-
-      <section id="products" className="mx-auto max-w-6xl scroll-mt-24 px-4 pb-16 sm:px-6">
+      <section id="products" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-8 sm:px-6">
         {data && !data.open && (
           <p role="status" className="mb-6 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">The store is not taking orders at the moment — please check back soon. You can still browse.</p>
         )}
