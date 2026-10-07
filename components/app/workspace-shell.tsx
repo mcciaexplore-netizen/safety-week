@@ -21,6 +21,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Repeat,
+  ShoppingBag,
+  Store,
   X,
 } from "lucide-react";
 import { MCCIALogo } from "@/components/brand/logo";
@@ -36,6 +38,7 @@ const NAV = [
   { href: "/invoices", label: "Invoices", icon: ListChecks },
   { href: "/invoices/new", label: "New Proforma", icon: FilePlus2 },
 ];
+const ONLINE_NAV = { href: "/online-orders", label: "Online orders", icon: ShoppingBag };
 const ADMIN_NAV = [
   { href: "/stock", label: "Stock", icon: Boxes },
   { href: "/admin/audit-logs", label: "Audit log", icon: ScrollText },
@@ -46,6 +49,8 @@ const SUPER_NAV = [
   { href: "/admin/branches", label: "Branches", icon: Building2 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/invoices", label: "Invoices", icon: ListChecks },
+  { href: "/online-orders", label: "Online orders", icon: ShoppingBag },
+  { href: "/admin/online-store", label: "Online store", icon: Store },
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/stock", label: "Stock", icon: Boxes },
   { href: "/admin/event", label: "Event configuration", icon: CalendarCog },
@@ -121,7 +126,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         )}
       </div>
       <nav className={cn("flex-1 space-y-1", compact ? "p-2" : "p-3")} aria-label="Workspace">
-        {(session.user.role === "SUPER_ADMIN" ? SUPER_NAV : [...NAV, ...(API_MODE && session.user.role !== "BRANCH_USER" ? ADMIN_NAV : [])]).map(({ href, label, icon: Icon }) => (
+        {(session.user.role === "SUPER_ADMIN" ? SUPER_NAV : [...NAV, ...(API_MODE ? [ONLINE_NAV] : []), ...(API_MODE && session.user.role !== "BRANCH_USER" ? ADMIN_NAV : [])]).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

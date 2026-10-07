@@ -28,6 +28,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 ROLES = ("SUPER_ADMIN", "BRANCH_ADMIN", "BRANCH_USER")
 EVENT_STATUSES = ("PLANNING", "OPEN", "CLOSED")
 PAYMENT_MODES = ("CASH", "UPI", "CARD", "NET_BANKING", "OTHER")
+ORDER_STATUSES = ("PLACED", "READY", "PICKED_UP", "CANCELLED", "EXPIRED")
 INVOICE_STATUSES = ("DRAFT", "SUBMITTED", "GENERATED", "EDITED", "CANCELLED")
 
 
@@ -126,6 +127,7 @@ class Product(Base):
     __table_args__ = (
         UniqueConstraint("event_id", "sku"),
         CheckConstraint("current_rate >= 0", name="ck_products_rate"),
+        Index("uq_products_event_slug", "event_id", "slug", unique=True),
     )
     id: Mapped[uuid.UUID] = pk()
     event_id: Mapped[uuid.UUID] = fk("events.id")
@@ -142,6 +144,11 @@ class Product(Base):
     rate_confirmed: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     line_order: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    # online store
+    slug: Mapped[str | None] = mapped_column(String(120))
+    category: Mapped[str] = mapped_column(String(60), server_default="")
+    image_url: Mapped[str] = mapped_column(String(500), server_default="")
+    online_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
 
 
 class DiscountRule(Base):
@@ -379,3 +386,58 @@ class BranchStock(Base):
     product_id: Mapped[uuid.UUID] = fk("products.id")
     opening_qty: Mapped[int] = mapped_column(Integer)
     low_threshold: Mapped[int] = mapped_column(Integer, server_default="10")
+
+
+class Customer(Base):
+    """A shopper who signed in with an e-mail code (guests have no row). Owner-only table."""
+
+    __tablename__ = "customers"
+    id: Mapped[uuid.UUID] = pk()
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    name: Mapped[str] = mapped_column(String(200), server_default="")
+    phone: Mapped[str] = mapped_column(String(50), server_default="")
+    created_at: Mapped[datetime] = created()
+
+
+class LoginCode(Base):
+    __tablename__ = "login_codes"
+    __table_args__ = (Index("ix_login_codes_email", "email", "created_at"),)
+    id: Mapped[uuid.UUID] = pk()
+    email: Mapped[str] = mapped_column(String(320))
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    created_at: Mapped[datetime] = created()
+
+
+class Order(Base):
+    """An online order for pick-up at one branch. The money, lines and PDF live on the linked invoice."""
+
+    __tablename__ = "orders"
+    __table_args__ = (
+        CheckConstraint("status IN ('PLACED', 'READY', 'PICKED_UP', 'CANCELLED', 'EXPIRED')", name="ck_orders_status"),
+        CheckConstraint("payment_method IN ('PAY_AT_PICKUP', 'ONLINE')", name="ck_orders_payment_method"),
+        CheckConstraint("payment_status IN ('UNPAID', 'PAID')", name="ck_orders_payment_status"),
+        Index("ix_orders_branch_created", "branch_id", "created_at"),
+        Index("ix_orders_email", "customer_email"),
+    )
+    id: Mapped[uuid.UUID] = pk()
+    number: Mapped[str] = mapped_column(String(40), unique=True)  # = the invoice number
+    invoice_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("invoices.id"), unique=True)
+    branch_id: Mapped[uuid.UUID] = fk("branches.id")
+    event_id: Mapped[uuid.UUID] = fk("events.id")
+    customer_id: Mapped[uuid.UUID | None] = fk("customers.id", nullable=True)
+    customer_name: Mapped[str] = mapped_column(String(200))
+    customer_email: Mapped[str] = mapped_column(String(320))
+    customer_phone: Mapped[str] = mapped_column(String(50), server_default="")
+    status: Mapped[str] = mapped_column(String(12), server_default="PLACED")
+    payment_method: Mapped[str] = mapped_column(String(16))
+    payment_status: Mapped[str] = mapped_column(String(8), server_default="UNPAID")
+    note: Mapped[str] = mapped_column(Text, server_default="")
+    total: Mapped[Decimal] = mapped_column(Numeric(16, 2))
+    item_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = created()
+    updated_at: Mapped[datetime] = created()
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    picked_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

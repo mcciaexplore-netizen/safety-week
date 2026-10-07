@@ -56,7 +56,7 @@ Do not use the previously discussed branch names such as Sadar or Bhusari. Those
 
 Human-facing branch names and codes should come from the database/configuration layer, not be duplicated throughout UI code.
 
-> **Planned addition (2026-10):** the five branches stay locked, but a sixth, non-physical sales channel — **Online Store, code `ONL`** — is planned (see section 27A and `docs/online-store-plan.md`). It is a `branches` row with `kind = ONLINE`, has no staff users and is managed by the central admin only. Until Phase S1 of that plan is built, "five branches" in this document is still literally true; after S1 code must read the branch list from the API rather than assume five.
+> **Update (2026-10):** the five branches stay locked. The **online store** (`/store`) is not a sixth branch: an online order is an invoice of the branch the customer chooses to collect from (see section 27A).
 
 ---
 
@@ -1138,17 +1138,15 @@ Owner: create the Supabase project and users (`docs/setup-supabase.md`) - deferr
 
 ---
 
-# 27A. Online Store — Planned Channel
+# 27A. Online Store (pick-up only)
 
-**Status: PLAN APPROVED FOR REVIEW — not built.** Full plan: [`docs/online-store-plan.md`](docs/online-store-plan.md).
+**Status: BUILT except online payment.** Full plan and status: [`docs/online-store-plan.md`](docs/online-store-plan.md).
 
-**Goal.** A public e-commerce site (own address, e.g. `shop.<domain>`) where anyone can browse the MCCIA safety merchandise, add to cart, pay online and receive a GST tax invoice and delivery, run as a sixth channel (`ONL`) of this system so sales can be compared with the five branch offices. Managed by the central admin only.
+A public shop at `/store` in the same website: visitors browse the materials, see **stock at each of the five branches**, add to cart, choose the **branch to collect from** (no delivery, no couriers) and pay **at pick-up** (cash/UPI/card at the counter; Razorpay online payment is the last phase and shows as "coming soon"). Prices show the shelf price with the GST-inclusive price in brackets underneath. Sign-in is optional: guest checkout, or a 6-digit e-mail code.
 
-**Architecture (decided).** New Next.js storefront in `store/` (own Vercel project and domain) -> the **same FastAPI + Neon database** through a new public router `/api/v1/store/*` with a restricted DB role. Staff app unchanged except an "Online store" section for the central admin. Stock, invoices, audit, reports and Excel exports are reused with `ONL` as a branch.
+An order is created as an ordinary SUBMITTED invoice of the pick-up branch (stock goes down at once, PDF e-mailed) plus an `orders` row (migration `0011`: `customers`, `login_codes`, `orders`, shop columns on `products`). Branch staff use **Online orders** (mark ready, collected + payment mode, cancel); the central admin has **Online store** analytics comparing online with branch-office sales. Uncollected orders are released after `PICKUP_HOLD_DAYS` (default 3) by a daily job (`CRON_SECRET`). The store is closed until the event is OPEN.
 
-**Key choices awaiting owner confirmation:** Razorpay for payments; GST-inclusive consumer prices; tax invoice with IGST for out-of-state buyers (accountant to confirm); all-India delivery with manual courier entry first; guest checkout + passwordless e-mail-code sign-in; online has its own stock via the existing Transfer feature and never oversells; no cash on delivery; refunds with credit notes.
-
-**Phases:** S0 decisions/accounts -> S1 channel foundation (`ONL`, IGST, tax-invoice kind) -> S2 catalogue (images, online fields) -> S3 storefront shell -> S4 sign-in and checkout -> S5 payments + automatic invoice + e-mail -> S6 fulfilment screens -> S7 analytics -> S8 hardening -> S9 pilot and launch (about 9-10 weeks of build after S0).
+**Before announcing it:** set the e-mail backend (`EMAIL_BACKEND` = `smtp` or `resend`, `EMAIL_FROM`, `STORE_URL`), `CRON_SECRET`, enter each branch's stock, add product photos/categories, then run one real order end to end.
 
 ---
 
@@ -1313,3 +1311,12 @@ Owner: create the Supabase project and users (`docs/setup-supabase.md`) - deferr
 - **Features since the last entry:** central-admin stock matrix of all branches with digital branch-to-branch transfers (migration `0009`); per-branch buttons on Admin > Invoices; new form layout (customer, materials table, invoice info, summary) with a floating preview and a preview-before-submit step; invoice serial numbers 1-39; new logo (web app only; PDF keeps the old one); "Proforma" spelling everywhere; dev banner hidden on the live site.
 - **Theme:** MCCIA Applied AI Studio theme (tokens in `app/globals.css`, Outfit + Bricolage Grotesque, glass cards, count-up numbers, animated header grid). The printed invoice sheet keeps its workbook colours.
 - **Planned next:** the Online Store channel — see section 27A and `docs/online-store-plan.md`. No code written yet.
+
+## 2026-10-07 — Online store (pick-up) built
+
+- **Owner decisions:** no delivery; pick-up from any of the five branches; pay at pick-up now and Razorpay online payment last; GST-inclusive price shown in small brackets under the shelf price; guest checkout + e-mail-code sign-in; same Vercel address (`/store`) for now.
+- **API:** `api/app/store.py` (public: catalogue with per-branch stock, e-mail-code sign-in, orders, order lookup/cancel/invoice, expiry job), `api/app/store_orders.py` (staff: list/ready/pickup with payment/cancel, central-admin analytics), `api/app/mailer.py` (console / smtp / resend / memory), `api/app/catalogue.py` (slugs, categories), migration `0011`, `Product` gained `slug/category/image_url/online_enabled` (editable in Admin > Products), config for e-mail, store URL, hold days and cron secret, daily cron in `api/vercel.json`.
+- **Web:** `app/(store)/store/*` (home + catalogue, product, cart, checkout, order, account, help), `components/store/*`, `lib/store/client.ts` (cart, branch, sign-in kept in the browser); staff `app/(workspace)/online-orders` and `app/(workspace)/admin/online-store`; nav entries; "Online store" link on the public header.
+- **Security:** shopper tokens (`aud=customer`) never open staff endpoints; per-branch lock and server-side stock check so the last unit is never sold twice; code sign-in limited (5 codes/hour, 5 guesses); 5 open orders per e-mail; customers/login codes owner-only; orders visible only to their branch and the central admin (database policy).
+- **Tests:** `api/tests/test_store.py` (8 tests) and `e2e/store.spec.ts` (real-stack journey: shop -> cart -> checkout -> order -> branch marks ready and collected with UPI -> central admin analytics). 113 API tests pass; typecheck and lint clean.
+- **Not done / next:** Razorpay online payment (last); e-mail provider credentials; product photos; Turnstile bot check and edge rate limits; a restricted database role for the public router; a separate store domain.

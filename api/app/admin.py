@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from . import repositories as repo
+from .catalogue import category_of, slugify
 from . import services
 from .auth import Principal, current_principal
 from .db import get_session
@@ -279,6 +280,10 @@ class ProductAdminOut(Strict):
     line_order: int
     active: bool
     rate_confirmed: bool
+    slug: str | None = None
+    category: str = ""
+    image_url: str = ""
+    online_enabled: bool = True
 
 
 class ProductIn(Strict):
@@ -293,6 +298,9 @@ class ProductIn(Strict):
     line_order: int = Field(ge=1)
     active: bool = True
     confirm_rate: bool = False  # "I have checked this rate for the current event"
+    category: str = Field(default="", max_length=60)
+    image_url: str = Field(default="", max_length=500, pattern=r"^$|^https://\S+$")
+    online_enabled: bool = True  # shown in the online store
 
 
 class ConfirmIn(Strict):
@@ -314,8 +322,9 @@ def list_products(s: Sess, event_id: uuid.UUID | None = None):
 def create_product(data: ProductIn, s: Sess, event_id: uuid.UUID | None = None):
     e = _event_for(s, event_id)
     fields = data.model_dump(exclude={"confirm_rate"})
+    fields["category"] = fields["category"] or category_of(data.name)
     p = Product(id=uuid.uuid4(), event_id=e.id, sku=f"{e.invoice_prefix}-{uuid.uuid4().hex[:6].upper()}",
-                rate_confirmed=True, **fields)  # a product an admin just typed in is deliberate
+                slug=f"{slugify(data.name)}-{uuid.uuid4().hex[:4]}", rate_confirmed=True, **fields)  # a product an admin just typed in is deliberate
     s.add(p)
     commit(s)
     return p

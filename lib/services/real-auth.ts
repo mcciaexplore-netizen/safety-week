@@ -1,6 +1,6 @@
 import { BRANCHES } from "@/lib/mock/branches";
 import type { Branch, UserRole } from "@/lib/types";
-import { getSession, setSession } from "./session-store";
+import { setSession } from "./session-store";
 import { AuthError, type AuthService, type Session } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;

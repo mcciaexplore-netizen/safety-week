@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from .db import SessionLocal
 from .admin import DEFAULT_HEADER
+from .catalogue import category_of, slugify
 from .models import AppSetting, Branch, Event, Product
 
 BRANCHES = [
@@ -49,7 +50,7 @@ def seed(s: Session) -> None:
             .values(
                 event_id=event.id, sku=f"NSW-{p['line_order']:03d}", name=p["name"], hsn_code=p["hsn_code"],
                 current_rate=p["rate"], cgst_rate=p["gst_half_rate"], sgst_rate=p["gst_half_rate"],
-                sr_no=p["sr_no"], line_order=p["line_order"],
+                sr_no=p["sr_no"], line_order=p["line_order"], slug=slugify(p["name"]), category=category_of(p["name"]),
             )
             # Re-seeding never overwrites an admin's edits to rates or names.
             .on_conflict_do_nothing(index_elements=[Product.event_id, Product.sku])

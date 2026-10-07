@@ -7,7 +7,7 @@ Internal system for MCCIA's five branch offices to prepare, track and report Pro
 | Staff web app | repo root (Next.js 16, Tailwind 4, shadcn) | live: `nsw-web` on Vercel |
 | API | `api/` (FastAPI, SQLAlchemy, Alembic) | live: `nsw-api` on Vercel; PDFs drawn with ReportLab |
 | Database | Neon PostgreSQL (Singapore) | row-level security keeps branches apart |
-| Online store (planned) | `store/` (not created yet) | see [docs/online-store-plan.md](docs/online-store-plan.md) |
+| Online store (pick-up) | `app/(store)/store/*` in the same Next.js app, API in `api/app/store*.py` | `/store`; see [docs/online-store-plan.md](docs/online-store-plan.md) |
 
 ## Run it locally
 
@@ -31,5 +31,5 @@ npx playwright test          # e2e; API_E2E=1 for the real-stack journeys
 - [plan.md](plan.md) — the master plan, decisions and change log (start here)
 - [docs/invoice-spec.md](docs/invoice-spec.md) — the invoice layout/calculation spec taken from the 2026 workbook
 - [docs/deploy.md](docs/deploy.md) — going live on Vercel + Neon
-- [docs/online-store-plan.md](docs/online-store-plan.md) — plan for the public online store channel
+- [docs/online-store-plan.md](docs/online-store-plan.md) — the online store (pick-up from branches): decisions, flow, screens, operations checklist
 - [AGENTS.md](AGENTS.md) — notes for AI coding assistants (this repo uses a newer Next.js than most training data)

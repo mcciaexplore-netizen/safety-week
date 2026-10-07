@@ -22,7 +22,7 @@ $env:DATABASE_URL = "<DIRECT string>"
 .venv\Scripts\python -m app.seed
 .venv\Scripts\python -m app.admin_cli create-user --email you@mcciapune.com --name "Central Admin" --role SUPER_ADMIN --password "<long password>"
 ```
-Run `alembic upgrade head` again whenever a new release adds a migration. Everyone else is added from the **Users** page.
+Run `alembic upgrade head` again whenever a new release adds a migration — **before** deploying the API that needs it. Everyone else is added from the **Users** page.
 
 ## 3. API project (`nsw-api`)
 ```
@@ -38,6 +38,10 @@ Environment variables (Production), e.g. `vercel env add NAME production`:
 | `JWT_SECRET` | 48+ random characters |
 | `STORAGE_BACKEND` | `db` |
 | `CORS_ORIGINS` | `["https://YOUR-SITE"]` |
+| `EMAIL_BACKEND` | `smtp` (Gmail app password) or `resend` — needed for sign-in codes and order e-mails |
+| `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (or `RESEND_API_KEY`) | your mail account |
+| `STORE_URL` | `https://YOUR-SITE/store` (links in e-mails) |
+| `CRON_SECRET` | random string; the daily job that frees uncollected orders uses it |
 
 Then `vercel deploy --prod`. The API refuses to start in production if the secret is short, `DEV_LOGIN` is on,
 CORS lists localhost, or PDFs would be written to disk. Check `https://YOUR-API/health`.

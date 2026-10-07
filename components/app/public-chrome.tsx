@@ -26,6 +26,12 @@ export function PublicHeader() {
             NSW {EVENT.year}
           </Link>
           <Link
+            href="/store"
+            className={cn(buttonVariants({ variant: "ghost" }), "hidden sm:inline-flex")}
+          >
+            Online store
+          </Link>
+          <Link
             href="/select-branch"
             className={cn(buttonVariants({ variant: "ghost" }), "hidden sm:inline-flex")}
           >

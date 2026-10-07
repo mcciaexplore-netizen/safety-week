@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     # Where generated PDFs are kept: "local" (a folder, dev/tests) or "db" (a table in the database, production).
     storage_backend: str = "local"
     storage_dir: str = "storage"
+    # --- online store ---
+    # E-mail (order confirmations, sign-in codes): "console" (dev: printed to the log), "smtp" or "resend".
+    email_backend: str = "console"
+    email_from: str = "MCCIA Store <store@mcciapune.com>"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    resend_api_key: str = ""
+    store_url: str = "http://localhost:3000/store"  # used in e-mail links
+    pickup_hold_days: int = 3  # an order not collected within this many days is cancelled and its stock freed
+    cron_secret: str = ""  # shared secret for the scheduled clean-up job
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3100"]
 
 
