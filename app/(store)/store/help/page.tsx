@@ -22,8 +22,8 @@ export default function HelpPage() {
         <p>When your order is packed we e-mail you again. Show the invoice (on your phone is fine) at the branch and take your order home.</p>
       </Q>
       <Q id="payment" title="Payment options">
-        <p><strong className="text-foreground">Pay at pick-up</strong> — pay at the branch counter by cash, UPI or card when you collect. Nothing is charged online.</p>
-        <p><strong className="text-foreground">Pay online</strong> — UPI, cards and net banking. Coming soon.</p>
+        <p><strong className="text-foreground">Pay at pick-up</strong> — pay at the branch counter when you collect, by cash or by UPI / card through Razorpay. Nothing is charged online.</p>
+        <p><strong className="text-foreground">Pay online</strong> — through Razorpay: UPI, cards and net banking. Coming soon.</p>
         <p>Prices on the website are shown before GST, with the GST-inclusive price in brackets underneath. Your invoice shows the GST in full.</p>
       </Q>
       <Q title="Changes, cancellations and holding time">

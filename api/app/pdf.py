@@ -29,7 +29,7 @@ LABELS = {
     "words": "Amount in Words", "payment": "Payment Details", "rounded": "Rounded off Amount..",
     "total_row": "Total …",
 }
-PAYMENT_LABEL = {"CASH": "Cash", "UPI": "UPI", "CARD": "Card", "NET_BANKING": "Net banking", "OTHER": "Other"}
+PAYMENT_LABEL = {"CASH": "Cash", "RAZORPAY": "Razorpay", "UPI": "UPI", "CARD": "Card", "NET_BANKING": "Net banking", "OTHER": "Other"}
 
 # (key, heading, Excel width, alignment) - the workbook's column widths decide the proportions
 STD_COLS = [

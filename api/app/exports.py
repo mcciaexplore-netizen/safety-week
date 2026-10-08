@@ -30,7 +30,7 @@ THIN = Side(style="thin")
 BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 BOLD = Font(name="Calibri", bold=True)
 MONEY = '#,##0.00;-#,##0.00;"-"'
-MODE = {"CASH": "Cash", "UPI": "UPI", "CARD": "Card", "NET_BANKING": "Net banking", "OTHER": "Other"}
+MODE = {"CASH": "Cash", "RAZORPAY": "Razorpay", "UPI": "UPI", "CARD": "Card", "NET_BANKING": "Net banking", "OTHER": "Other"}
 BAD_TAB_CHARS = re.compile(r"[\[\]:*?/\\]")
 
 

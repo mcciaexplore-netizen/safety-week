@@ -39,8 +39,8 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await matt.fill("3");
   await expect(page.getByTestId("form-grand-total")).toHaveText("123.90");
   await expect(page.getByLabel(/^Rate for /)).toHaveCount(0); // branch users cannot change rates (no rate inputs)
-  await page.getByLabel("Mode of payment").selectOption("UPI");        // full amount, taken automatically
-  await page.getByLabel("Payment reference").fill("UTR 604794369987");
+  await page.getByLabel("Mode of payment").selectOption("RAZORPAY");        // full amount, taken automatically
+  await page.getByLabel("Payment reference").fill("pay_Abc604794369987");
   await page.getByRole("button", { name: /Save Draft/ }).click();
   await expect(page.getByTestId("save-state")).toContainText("Draft saved");
   await expect(page).toHaveURL(/\/invoices\/[0-9a-f-]{36}\/edit/); // UUID primary key in the URL
@@ -53,9 +53,9 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await page.reload();
   await expect(company(page)).toHaveValue(name);
   await expect(matt).toHaveValue("3");
-  await expect(page.getByLabel("Mode of payment")).toHaveValue("UPI");   // the payment came back from the database
+  await expect(page.getByLabel("Mode of payment")).toHaveValue("RAZORPAY");   // the payment came back from the database
   await inPreview(page, async () => {
-    await expect(page.getByTestId("paper-payment")).toContainText("UPI Rs. 124.00 (UTR 604794369987)");
+    await expect(page.getByTestId("paper-payment")).toContainText("Razorpay Rs. 124.00 (pay_Abc604794369987)");
     await expect(page.getByTestId("paper-grand-total")).toHaveText("123.90");
   });
 

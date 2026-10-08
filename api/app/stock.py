@@ -123,6 +123,25 @@ def low_stock(s: Sess, p: Me, branch: str | None = None, limit: Annotated[int, Q
             "low_count": len(low)}
 
 
+@router.get("/alerts")
+def alerts(s: Sess, p: Me, limit: Annotated[int, Query(ge=1, le=200)] = 60):
+    """Every low / out-of-stock material: all branches for the central admin, the own branch for everyone else.
+    Emptiest first. Feeds the alert button at the top of the admin screens."""
+    e = repo.current_event(s)
+    if e is None:
+        return {"count": 0, "out": 0, "low": 0, "items": []}
+    branches = list(s.scalars(select(Branch).where(Branch.active).order_by(Branch.name))) if p.is_super else [s.get(Branch, p.branch_id)]
+    rows = []
+    for b in branches:
+        for i in levels(s, b, e):
+            if i.status in ("LOW", "OUT"):
+                rows.append({"product_id": str(i.product_id), "name": i.name, "branch_code": b.code, "branch_name": b.name,
+                             "remaining": i.remaining or 0, "low_threshold": i.low_threshold, "status": i.status})
+    rows.sort(key=lambda r: (r["status"] != "OUT", r["remaining"], r["name"]))
+    return {"count": len(rows), "out": sum(r["status"] == "OUT" for r in rows), "low": sum(r["status"] == "LOW" for r in rows),
+            "items": rows[:limit]}
+
+
 @router.put("", response_model=StockOut)
 def save_stock(data: StockIn, s: Sess, p: Me, branch: str | None = None):
     """Set opening stock / low level. Central admin: any branch. Branch admin: their own branch only."""

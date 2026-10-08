@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
 import { EVENT } from "@/lib/config/app-config";
 import { API_MODE, REAL_AUTH, services } from "@/lib/services";
+import { LowStockButton } from "@/components/app/low-stock-alert";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -221,6 +222,8 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {/* admins see at a glance which materials are low and can jump to the Stock page */}
+            {API_MODE && (session.user.role === "SUPER_ADMIN" || session.user.role === "BRANCH_ADMIN") && <LowStockButton routeKey={pathname} />}
             <div className="hidden text-right leading-tight sm:block">
               <p className="text-sm font-medium">{session.user.name}</p>
               <p className="text-xs text-muted-foreground">Branch user</p>

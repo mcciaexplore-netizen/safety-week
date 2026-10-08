@@ -92,7 +92,7 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   await row.getByRole("button", { name: "Mark ready" }).click();
   await expect(row).toContainText("Ready for pick-up");
   await row.getByRole("button", { name: "Collected" }).click();
-  await staff.getByLabel("How did the customer pay?").selectOption("UPI");
+  await staff.getByLabel("How did the customer pay?").selectOption("RAZORPAY");
   await staff.getByRole("button", { name: "Confirm hand-over" }).click();
   await staff.getByRole("tab", { name: "Collected" }).click();
   await expect(staff.getByTestId("online-order-row").filter({ hasText: number })).toContainText("Paid");

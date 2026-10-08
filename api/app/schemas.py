@@ -76,7 +76,7 @@ class InvoiceItemIn(BaseModel):
 class PaymentIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    mode: Literal["CASH", "UPI", "CARD", "NET_BANKING", "OTHER"]
+    mode: Literal["CASH", "RAZORPAY", "UPI", "CARD", "NET_BANKING", "OTHER"]
     amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     reference: str = Field(default="", max_length=200)  # UTR / card slip / cheque no. / what "other" means
 

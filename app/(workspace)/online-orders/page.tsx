@@ -17,7 +17,7 @@ import type { Order } from "@/lib/store/client";
 type Row = Order & { id: string };
 const TABS: [string, string][] = [["OPEN", "To prepare / hand over"], ["READY", "Ready for pick-up"], ["PICKED_UP", "Collected"], ["CANCELLED", "Cancelled"], ["EXPIRED", "Released"]];
 const BRANCHES: [string, string][] = [["", "All branches"], ["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]];
-const MODES: [string, string][] = [["CASH", "Cash"], ["UPI", "UPI"], ["CARD", "Card"], ["NET_BANKING", "Net banking"], ["OTHER", "Other"]];
+const MODES: [string, string][] = [["CASH", "Cash"], ["RAZORPAY", "Razorpay (UPI / card)"]];
 const SEL = "h-9 rounded-lg border border-input bg-white px-3 text-sm";
 
 export default function OnlineOrdersPage() {

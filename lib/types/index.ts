@@ -110,7 +110,7 @@ export interface InvoiceTotals {
   roundedTotal: number;
 }
 
-export type PaymentMode = "CASH" | "UPI" | "CARD" | "NET_BANKING" | "OTHER";
+export type PaymentMode = "CASH" | "RAZORPAY" | "UPI" | "CARD" | "NET_BANKING" | "OTHER";
 export type PaymentStatus = "UNPAID" | "PARTIAL" | "PAID";
 
 /** One leg of a payment. A split payment is several of these (e.g. UPI 2000 + Cash 1938). */

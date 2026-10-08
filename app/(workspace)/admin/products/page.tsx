@@ -11,6 +11,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Input } from "@/components/ui/input";
 import { useAsync } from "@/hooks/use-async";
 import { formatMoney } from "@/lib/format";
+import { ProductStockFlag, useStockAlerts } from "@/components/app/low-stock-alert";
 import { api } from "@/lib/services/api";
 
 interface Product { id: string; sku: string; name: string; description: string; hsn_code: string; unit: string; current_rate: string; cgst_rate: string; sgst_rate: string; sr_no: number | null; line_order: number; active: boolean; rate_confirmed: boolean; category: string; image_url: string; online_enabled: boolean }
@@ -33,6 +34,7 @@ const FIELDS: FieldSpec[] = [
 ];
 
 export default function ProductsPage() {
+  const alerts = useStockAlerts(true, "products");
   const list = useAsync(() => api<Product[]>("/admin/products"), "admin-products");
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
@@ -65,7 +67,7 @@ export default function ProductsPage() {
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">
               {shown.map((x) => (
                 <tr key={x.id} data-testid="product-row" className={x.active ? "" : "opacity-60"}>
-                  <td className="text-muted-foreground">{x.line_order}</td><td className="font-medium">{x.name.replace(/\s+/g, " ")}{!x.active && <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>}</td>
+                  <td className="text-muted-foreground">{x.line_order}</td><td className="font-medium">{x.name.replace(/\s+/g, " ")}{!x.active && <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>}<ProductStockFlag alerts={(alerts.data?.items ?? []).filter((a) => a.product_id === x.id)} /></td>
                   <td className="font-mono">{x.hsn_code}</td><td className="text-right tabular-nums">{formatMoney(Number(x.current_rate))}</td><td className="text-right">{Number(x.cgst_rate)}% + {Number(x.sgst_rate)}%</td>
                   <td>{x.rate_confirmed ? <Badge variant="outline" className="bg-success/10 text-success-fg">Confirmed</Badge> : <Badge variant="outline" className="bg-warning/10 text-warning">2026 reference</Badge>}</td>
                   <td className="text-right"><Button variant="outline" size="icon-sm" aria-label={`Edit ${x.name}`} onClick={() => setEditing(x)}><Pencil /></Button></td>

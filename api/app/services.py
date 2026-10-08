@@ -169,12 +169,32 @@ def _snapshot(s: Session, p: Principal, invoice: Invoice, reason: str = "") -> N
         edited_by=p.user_id, edited_by_name=p.name, edit_reason=reason))
 
 
+def _check_stock(s: Session, branch, event, items: list[InvoiceItem], mine: dict | None = None) -> None:
+    """A submitted invoice cannot take more of a material than the branch has left. `mine` = what this invoice already
+    holds (a revision may keep its own quantities). Materials with no stock set up are not limited."""
+    from sqlalchemy import func
+
+    from .stock import levels  # local import: stock.py imports this module
+
+    s.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"store:{branch.id}"))))  # one seller at a time per branch
+    have = {i.product_id: i.remaining for i in levels(s, branch, event)}
+    for it in items:
+        left = have.get(it.product_id)
+        if left is None:
+            continue
+        allowed = left + (mine or {}).get(it.product_id, 0)
+        if it.quantity > allowed:
+            raise Invalid(f"Only {max(allowed, 0)} of {' '.join(it.particulars.split())} in stock at {branch.name}")
+
+
 def create_invoice(s: Session, p: Principal, data: InvoiceCreate, branch_code: str | None = None) -> Invoice:
     branch = _branch_for(s, p, branch_code)  # branch comes from the account, never the payload
     event = repo.current_event(s)
     if event is None:
         raise Invalid("No active event is configured")
     items, totals = _calculate(s, p, data, event)
+    if data.action == "submit":
+        _check_stock(s, branch, event, items)
     invoice = Invoice(
         invoice_number=allocate_invoice_number(s, branch.code), event_id=event.id, branch_id=branch.id,
         created_by=p.user_id, created_by_name=p.name, status="SUBMITTED" if data.action == "submit" else "DRAFT",
@@ -196,6 +216,9 @@ def update_invoice(s: Session, p: Principal, invoice_id: uuid.UUID, data: Invoic
     items, totals = _calculate(s, p, data, event)
 
     was_draft = invoice.status == "DRAFT"
+    if not (was_draft and data.action != "submit"):  # a submitted invoice or a revision: stock must cover it
+        _check_stock(s, s.get(repo.Branch, invoice.branch_id), event, items,
+                     None if was_draft else {i.product_id: i.quantity for i in invoice.items})
     reason = data.edit_reason.strip()
     if not was_draft and len(reason) < 3:
         raise Invalid("Give a reason for changing a submitted invoice")

@@ -114,6 +114,15 @@ def test_export_permissions_and_audit(client, people, invoices):
 
 
 # ---------------------------------------------------------------- stock
+@pytest.fixture(scope="module", autouse=True)
+def forget_stock_levels():
+    """Invoices are limited by the stock a branch has set up, so these tests must not leave stock behind for the others."""
+    yield
+    with engine.begin() as c:
+        c.execute(text("delete from stock_transfers"))
+        c.execute(text("delete from branch_stock"))
+
+
 def put_stock(client, h, items, branch=None):
     return client.put(f"{API}/stock", json={"items": items}, headers=h, params={"branch": branch} if branch else None)
 
@@ -225,3 +234,49 @@ def test_central_admin_sees_all_branches_and_transfers_stock(client, people, pro
     with engine.connect() as c:
         n = c.execute(text("select count(*) from audit_logs where action = 'stock.transfer'")).scalar()
     assert n >= 2
+
+
+# ---------------------------------------------------------------- stock limits, alerts, Razorpay mode
+def test_a_submitted_invoice_cannot_take_more_than_the_branch_has(client, people, prods):
+    adm, h = people["super"]["h"], people["til"]["h"]
+    items = {i["name"]: i for i in client.get(f"{API}/stock", headers=adm, params={"branch": "TIL"}).json()["items"]}
+    sold = items["Caps"]["sold"] + items["Caps"]["transferred_out"] - items["Caps"]["transferred_in"]
+    assert put_stock(client, adm, [{"product_id": prods["Caps"], "opening_qty": sold + 10, "low_threshold": 3}], branch="TIL").status_code == 200
+
+    def body(qty, action="submit", **extra):
+        return {"company_name": "Limit Co", "invoice_date": DAY, "action": action,
+                "items": [{"product_id": prods["Caps"], "quantity": qty}], **extra}
+
+    over = client.post(f"{API}/invoices", headers=h, json=body(11))
+    assert over.status_code == 422 and "Only 10 of Caps" in over.json()["detail"]
+    assert client.post(f"{API}/invoices", headers=h, json=body(50, action="draft")).status_code == 201     # a draft is only a note
+    ok = client.post(f"{API}/invoices", headers=h, json=body(8)).json()
+    assert client.post(f"{API}/invoices", headers=h, json=body(3)).status_code == 422                        # only 2 left now
+    # a revision may keep its own quantity but not exceed what is left plus that quantity
+    rev = lambda q: client.put(f"{API}/invoices/{ok['id']}", headers=h, json=body(q, edit_reason="change"))
+    assert rev(10).status_code == 200                                                                          # 2 left + its own 8
+    assert rev(11).status_code == 422
+    # a branch with no stock set up is not limited
+    assert client.post(f"{API}/invoices", headers=people["sbr"]["h"], json=body(9999)).status_code == 201
+
+
+def test_low_stock_alerts_for_the_central_admin_and_each_branch(client, people, prods):
+    adm = people["super"]["h"]
+    items = {i["name"]: i for i in client.get(f"{API}/stock", headers=adm, params={"branch": "BHO"}).json()["items"]}
+    base = items["Flags - Handy"]["sold"] + items["Flags - Handy"]["transferred_out"] - items["Flags - Handy"]["transferred_in"]
+    put_stock(client, adm, [{"product_id": prods["Flags - Handy"], "opening_qty": base + 3, "low_threshold": 5}], branch="BHO")   # 3 left, low at 5
+    a = client.get(f"{API}/stock/alerts", headers=adm).json()
+    mine = [i for i in a["items"] if i["name"] == "Flags - Handy" and i["branch_code"] == "BHO"]
+    assert mine and mine[0]["status"] == "LOW" and mine[0]["remaining"] == 3 and a["count"] >= 1 and a["low"] >= 1
+    assert all(i["branch_code"] == "BHO" for i in client.get(f"{API}/stock/alerts", headers=people["bho"]["h"]).json()["items"])
+    assert not client.get(f"{API}/stock/alerts", headers=people["sbr"]["h"]).json()["items"] or all(
+        i["branch_code"] == "SBR" for i in client.get(f"{API}/stock/alerts", headers=people["sbr"]["h"]).json()["items"])
+    assert client.get(f"{API}/stock/alerts").status_code == 401
+
+
+def test_razorpay_is_a_payment_mode(client, people, prods):
+    r = client.post(f"{API}/invoices", headers=people["sbr"]["h"], json={
+        "company_name": "Rzp Co", "invoice_date": DAY, "action": "submit",
+        "items": [{"product_id": prods["Badges"], "quantity": 1}],
+        "payments": [{"mode": "RAZORPAY", "amount": "6", "reference": "pay_Abc123"}]})
+    assert r.status_code == 201 and r.json()["payments"][0]["mode"] == "RAZORPAY" and r.json()["payment_status"] == "PAID"

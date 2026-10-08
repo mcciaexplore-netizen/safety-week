@@ -81,7 +81,7 @@ def mark_ready(order_id: uuid.UUID, s: Sess, p: Me):
 
 class PickupIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    payment_mode: Literal["CASH", "UPI", "CARD", "NET_BANKING", "OTHER"] | None = None
+    payment_mode: Literal["CASH", "RAZORPAY", "UPI", "CARD", "NET_BANKING", "OTHER"] | None = None
     reference: str = Field(default="", max_length=200)
 
 

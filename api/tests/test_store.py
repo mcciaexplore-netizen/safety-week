@@ -22,6 +22,9 @@ def store_open():
     yield
     settings.email_backend, settings.cron_secret = saved
     with engine.begin() as c:
+        c.execute(text("delete from stock_transfers"))
+        c.execute(text("delete from branch_stock"))
+    with engine.begin() as c:
         c.execute(text("update events set status = :s where invoice_prefix = 'NSW27'"), {"s": before})
 
 

@@ -36,7 +36,7 @@ function Table({ title, head, rows }: { title: string; head: string[]; rows: (st
   );
 }
 
-const MODE_LABEL: Record<string, string> = { CASH: "Cash", UPI: "UPI", CARD: "Card", NET_BANKING: "Net banking", OTHER: "Other" };
+const MODE_LABEL: Record<string, string> = { CASH: "Cash", RAZORPAY: "Razorpay", UPI: "UPI", CARD: "Card", NET_BANKING: "Net banking", OTHER: "Other" };
 const money = (v: string | number) => formatMoney(Number(v));
 const csvCell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
 

@@ -108,11 +108,11 @@ export default function CheckoutPage() {
               <label className="flex cursor-pointer gap-3 rounded-xl border border-primary bg-white/70 p-4 ring-[3px] ring-primary/10">
                 <input type="radio" name="pay" checked readOnly className="mt-1" />
                 <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><Banknote className="size-4 text-primary" />Pay at pick-up</span>
-                  <span className="block text-xs text-muted-foreground">Pay by cash, UPI or card at the branch counter when you collect.</span></span>
+                  <span className="block text-xs text-muted-foreground">Pay at the branch counter when you collect — by cash, or by UPI / card through Razorpay.</span></span>
               </label>
               <label className="flex gap-3 rounded-xl border border-dashed bg-muted/50 p-4 opacity-70">
                 <input type="radio" name="pay" disabled className="mt-1" />
-                <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4" />Pay online <span className="rounded-full bg-primary/10 px-2 text-[0.65rem] font-bold uppercase text-primary">Coming soon</span></span>
+                <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4" />Pay online with Razorpay <span className="rounded-full bg-primary/10 px-2 text-[0.65rem] font-bold uppercase text-primary">Coming soon</span></span>
                   <span className="block text-xs text-muted-foreground">UPI, cards and net banking — pay now and just collect.</span></span>
               </label>
             </div>

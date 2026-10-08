@@ -22,6 +22,7 @@ export function MaterialsTable({
   canEditRate,
   onQty,
   onRate,
+  limits,
 }: {
   products: Product[];
   view: InvoiceView;
@@ -29,6 +30,8 @@ export function MaterialsTable({
   canEditRate: boolean;
   onQty: (productId: string, qty: number) => void;
   onRate: (productId: string, rate: number) => void;
+  /** How many of each material the branch can still sell (absent = stock not set up, so no limit). */
+  limits?: Record<string, number | null>;
 }) {
   const lines = useMemo(() => new Map(view.lines.filter((l) => l.productId).map((l) => [l.productId, l])), [view.lines]);
   const t = view.totals;
@@ -46,6 +49,7 @@ export function MaterialsTable({
               <th>HSN</th>
               <th className="text-right">Rate (₹)</th>
               {disc && <th className="text-right">After discount</th>}
+              {limits && <th className="text-right">In stock</th>}
               <th className="w-28 text-center">Qty.</th>
               <th className="text-right">GST</th>
               <th className="text-right">Amount (₹)</th>
@@ -56,8 +60,10 @@ export function MaterialsTable({
               const l = lines.get(p.id);
               const qty = l?.quantity ?? 0;
               const name = clean(p.name);
+              const limit = limits ? (limits[p.id] ?? null) : null;
+              const over = limit !== null && qty > limit;
               return (
-                <tr key={p.id} data-testid="material-row" className={cn(qty > 0 && "bg-success/10")}>
+                <tr key={p.id} data-testid="material-row" className={cn(qty > 0 && !over && "bg-success/10", over && "bg-danger/10")}>
                   <td className="text-muted-foreground tabular-nums">{idx + 1}</td>
                   <td className="font-medium">{name}</td>
                   <td className="font-mono text-sm text-muted-foreground">{p.hsnCode}</td>
@@ -77,6 +83,11 @@ export function MaterialsTable({
                     )}
                   </td>
                   {disc && <td className="text-right tabular-nums text-muted-foreground">{l ? formatMoney(l.rateAfterDiscount) : "—"}</td>}
+                  {limits && (
+                    <td className={cn("text-right tabular-nums", over ? "font-semibold text-danger" : limit === 0 ? "text-danger" : "text-muted-foreground")} data-testid="stock-left">
+                      {limit === null ? "—" : limit}
+                    </td>
+                  )}
                   <td className="text-center">
                     <Input
                       type="number"
@@ -88,8 +99,10 @@ export function MaterialsTable({
                       aria-label={`Quantity for ${name}`}
                       data-testid="qty-input"
                       onChange={(e) => onQty(p.id, Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                      className={cn("mx-auto w-24 text-center tabular-nums", qty > 0 && "border-success/50 font-semibold")}
+                      className={cn("mx-auto w-24 text-center tabular-nums", qty > 0 && "border-success/50 font-semibold", over && "border-danger bg-danger/10 font-semibold text-danger ring-[3px] ring-danger/20")}
+                      aria-invalid={over || undefined}
                     />
+                    {over && <p role="alert" className="mt-1 text-xs font-semibold text-danger">Only {limit} in stock</p>}
                   </td>
                   <td className="text-right tabular-nums text-muted-foreground">{p.gstHalfRate * 2}%</td>
                   <td className={cn("text-right tabular-nums", qty > 0 ? "font-medium" : "text-muted-foreground")}>
@@ -106,6 +119,7 @@ export function MaterialsTable({
               <td />
               <td />
               {disc && <td />}
+              {limits && <td />}
               <td className="text-center tabular-nums" data-testid="total-qty">{formatNumber(t.totalQuantity)}</td>
               <td />
               <td className="text-right tabular-nums">{formatMoney(t.grandTotal)}</td>

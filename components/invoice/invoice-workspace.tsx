@@ -15,11 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAsync } from "@/hooks/use-async";
 import { useSession } from "@/hooks/use-session";
 import { formatDateTime, formatRupees } from "@/lib/format";
 import { computeView, invoiceToDraft, itemFromProduct, withSyncedPayment, type InvoiceDraft } from "@/lib/invoice/model";
 import { validateDraft, ValidationError, type ValidationMode } from "@/lib/invoice/validation";
-import { services } from "@/lib/services";
+import { API_MODE, services } from "@/lib/services";
+import { api } from "@/lib/services/api";
 import type { Invoice, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InvoiceForm } from "./invoice-form";
@@ -48,6 +50,24 @@ export function InvoiceWorkspace({
   const [resetOpen, setResetOpen] = useState(false);
   // The proforma preview: opened by the floating button ("view"), or by Submit as the final check ("submit").
   const [preview, setPreview] = useState<"view" | "submit" | null>(null);
+
+  // stock the branch can still sell (live server only): a quantity above it turns red and cannot be submitted
+  const stockNow = useAsync(
+    () => (API_MODE && session ? api<{ items: { product_id: string; remaining: number | null }[] }>("/stock") : Promise.resolve(null)),
+    `stock-limits:${session?.user.id}`,
+  );
+  const limits = useMemo(() => {
+    if (!stockNow.data) return undefined;
+    // an invoice that is already counted (submitted / edited) keeps its own quantities available for revision
+    const own = new Map(saved.status && saved.status !== "DRAFT" && saved.status !== "CANCELLED" ? saved.items.map((i) => [i.productId ?? "", i.quantity]) : []);
+    const out: Record<string, number | null> = {};
+    for (const i of stockNow.data.items) out[i.product_id] = i.remaining === null ? null : Math.max(0, i.remaining + (own.get(i.product_id) ?? 0));
+    return out;
+  }, [stockNow.data, saved]);
+  const overStock = useMemo(
+    () => (limits ? draft.items.filter((i) => i.quantity > 0 && i.productId && limits[i.productId] != null && i.quantity > (limits[i.productId] as number)) : []),
+    [draft.items, limits],
+  );
 
   const view = useMemo(() => computeView(draft), [draft]);
   const errors = useMemo(() => (attempted ? validateDraft(draft, attempted) : {}), [draft, attempted]);
@@ -109,6 +129,10 @@ export function InvoiceWorkspace({
   function requestSubmit() {
     setServerError(null);
     setNotice(null);
+    if (overStock.length > 0) {
+      setServerError(`Some quantities are more than the stock available (${overStock.map((i) => i.particulars.replace(/\s+/g, " ")).join(", ")}). Reduce them to continue.`);
+      return;
+    }
     setAttempted("submit");
     if (Object.keys(validateDraft(draft, "submit")).length > 0) return;
     setPreview("submit");
@@ -176,7 +200,7 @@ export function InvoiceWorkspace({
                 Save Draft
               </Button>
             )}
-            <Button type="button" onClick={requestSubmit} disabled={!!saving || cancelled}>
+            <Button type="button" onClick={requestSubmit} disabled={!!saving || cancelled || overStock.length > 0} title={overStock.length > 0 ? "Some quantities are more than the stock available" : undefined}>
               {saving === "submit" ? (
                 <Loader2 className="animate-spin" data-icon="inline-start" />
               ) : (
@@ -211,6 +235,7 @@ export function InvoiceWorkspace({
               canEditRate={canEditRate}
               onQty={setQty}
               onRate={setRate}
+              limits={limits}
             />
           </fieldset>
         </div>

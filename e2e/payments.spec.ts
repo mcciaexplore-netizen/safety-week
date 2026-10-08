@@ -27,25 +27,25 @@ const paperPayment = (page: Page) => page.getByTestId("paper-payment");
 test("payment: one mode takes the full amount automatically and follows the total", async ({ page }) => {
   await newInvoice(page);
   await expect(page.getByTestId("payment-status")).toHaveText("Not paid yet");
-  await page.getByLabel("Mode of payment").selectOption("UPI");
-  await page.getByLabel("Payment reference").fill("UTR 604794369987");
+  await page.getByLabel("Mode of payment").selectOption("RAZORPAY");
+  await page.getByLabel("Payment reference").fill("pay_Abc604794369987");
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
-  await inPreview(page, () => expect(paperPayment(page)).toContainText("Payment Details : UPI Rs. 1,201.00 (UTR 604794369987)"));
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Payment Details : Razorpay Rs. 1,201.00 (pay_Abc604794369987)"));
   // change the order: the payment still equals the payable amount, nothing to re-type
   await page.getByLabel("Quantity for Flags - Normal", { exact: true }).fill("");
   await expect(page.getByTestId("form-rounded-total")).toHaveText("₹413.00");
-  await inPreview(page, () => expect(paperPayment(page)).toContainText("UPI Rs. 413.00"));
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Razorpay Rs. 413.00"));
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
-  // every mode is offered, including "Other"
+  // only two ways to pay are offered: cash, or Razorpay (UPI / card / net banking go through Razorpay)
   const options = await page.getByLabel("Mode of payment").locator("option").allTextContents();
-  expect(options).toEqual(["Not paid yet", "Cash", "UPI", "Card", "Net banking", "Other"]);
+  expect(options).toEqual(["Not paid yet", "Cash", "Razorpay"]);
   await page.getByLabel("Mode of payment").selectOption("");
   await inPreview(page, () => expect(paperPayment(page)).not.toContainText("Rs."));
 });
 
 test("payment: split between UPI and cash, part payment, over-payment refused, and it survives saving", async ({ page }) => {
   await newInvoice(page);
-  await page.getByLabel("Mode of payment").selectOption("UPI");
+  await page.getByLabel("Mode of payment").selectOption("RAZORPAY");
   await page.getByRole("button", { name: "Split payment" }).click();
   await expect(page.getByTestId("payment-row")).toHaveCount(2);
   await expect(page.getByTestId("payment-summary")).toContainText("balance ₹1,201.00");
@@ -58,7 +58,7 @@ test("payment: split between UPI and cash, part payment, over-payment refused, a
   await page.getByRole("button", { name: "Fill balance on payment 2" }).click();
   await expect(page.getByLabel("Amount for payment 2")).toHaveValue("701");
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
-  await inPreview(page, () => expect(paperPayment(page)).toContainText("UPI Rs. 500.00 (UTR 111) + Cash Rs. 701.00"));
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Razorpay Rs. 500.00 (UTR 111) + Cash Rs. 701.00"));
   await page.getByTestId("payment-section").screenshot({ path: "test-results/15-split-payment.png" });
 
   // more than the invoice is refused, and says so live
@@ -73,7 +73,7 @@ test("payment: split between UPI and cash, part payment, over-payment refused, a
   await expect(page.getByTestId("payment-status")).toContainText("balance due ₹501.00");
   await page.getByRole("button", { name: /Save Draft/ }).click();
   await expect(page.getByTestId("save-state")).toContainText("Draft saved");
-  await inPreview(page, () => expect(paperPayment(page)).toContainText("UPI Rs. 500.00 (UTR 111) + Cash Rs. 200.00  |  Balance due Rs. 501.00"));
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Razorpay Rs. 500.00 (UTR 111) + Cash Rs. 200.00  |  Balance due Rs. 501.00"));
 
   // reopening shows the split exactly as entered
   await page.reload();
@@ -95,19 +95,15 @@ test("payment: split between UPI and cash, part payment, over-payment refused, a
   await page.goBack();
 });
 
-test("payment: 'Other' needs a description; back to a single payment", async ({ page }) => {
+test("payment: back to a single payment keeps the first row and the full amount", async ({ page }) => {
   await newInvoice(page);
-  await page.getByLabel("Mode of payment").selectOption("OTHER");
-  await page.getByRole("button", { name: /Save Draft/ }).click();
-  await expect(page.getByText("Say how it was paid")).toBeVisible();
-  await page.getByLabel("Payment reference").fill("Demand draft 552211");
-  await expect(page.getByText("Say how it was paid")).toHaveCount(0);
-  await inPreview(page, () => expect(paperPayment(page)).toContainText("Other Rs. 1,201.00 (Demand draft 552211)"));
-
+  await page.getByLabel("Mode of payment").selectOption("RAZORPAY");
+  await page.getByLabel("Payment reference").fill("pay_Demand552211");
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Razorpay Rs. 1,201.00 (pay_Demand552211)"));
   await page.getByRole("button", { name: "Split payment" }).click();
   await expect(page.getByTestId("payment-row")).toHaveCount(2);
   await page.getByRole("button", { name: "Back to a single payment" }).click();
   await expect(page.getByTestId("payment-row")).toHaveCount(0);
-  await expect(page.getByLabel("Mode of payment")).toHaveValue("OTHER");        // first row kept
-  await expect(paperPayment(page)).toContainText("Other Rs. 1,201.00");          // amount back to the full payable
+  await expect(page.getByLabel("Mode of payment")).toHaveValue("RAZORPAY");        // first row kept
+  await inPreview(page, () => expect(paperPayment(page)).toContainText("Razorpay Rs. 1,201.00"));  // amount back to the full payable
 });
