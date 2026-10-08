@@ -28,7 +28,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 ROLES = ("SUPER_ADMIN", "BRANCH_ADMIN", "BRANCH_USER")
 EVENT_STATUSES = ("PLANNING", "OPEN", "CLOSED")
 PAYMENT_MODES = ("CASH", "RAZORPAY", "UPI", "CARD", "NET_BANKING", "OTHER")
-ORDER_STATUSES = ("PLACED", "READY", "PICKED_UP", "CANCELLED", "EXPIRED")
+ORDER_STATUSES = ("PENDING_PAYMENT", "PLACED", "READY", "PICKED_UP", "CANCELLED", "EXPIRED")
 INVOICE_STATUSES = ("DRAFT", "SUBMITTED", "GENERATED", "EDITED", "CANCELLED")
 
 
@@ -416,9 +416,10 @@ class Order(Base):
 
     __tablename__ = "orders"
     __table_args__ = (
-        CheckConstraint("status IN ('PLACED', 'READY', 'PICKED_UP', 'CANCELLED', 'EXPIRED')", name="ck_orders_status"),
+        CheckConstraint("status IN ('PENDING_PAYMENT', 'PLACED', 'READY', 'PICKED_UP', 'CANCELLED', 'EXPIRED')", name="ck_orders_status"),
         CheckConstraint("payment_method IN ('PAY_AT_PICKUP', 'ONLINE')", name="ck_orders_payment_method"),
-        CheckConstraint("payment_status IN ('UNPAID', 'PAID')", name="ck_orders_payment_status"),
+        CheckConstraint("payment_status IN ('UNPAID', 'PAID', 'REFUNDED')", name="ck_orders_payment_status"),
+        Index("uq_orders_razorpay_order", "razorpay_order_id", unique=True),
         Index("ix_orders_branch_created", "branch_id", "created_at"),
         Index("ix_orders_email", "customer_email"),
     )
@@ -431,7 +432,7 @@ class Order(Base):
     customer_name: Mapped[str] = mapped_column(String(200))
     customer_email: Mapped[str] = mapped_column(String(320))
     customer_phone: Mapped[str] = mapped_column(String(50), server_default="")
-    status: Mapped[str] = mapped_column(String(12), server_default="PLACED")
+    status: Mapped[str] = mapped_column(String(20), server_default="PLACED")
     payment_method: Mapped[str] = mapped_column(String(16))
     payment_status: Mapped[str] = mapped_column(String(8), server_default="UNPAID")
     note: Mapped[str] = mapped_column(Text, server_default="")
@@ -442,3 +443,7 @@ class Order(Base):
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     picked_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    razorpay_order_id: Mapped[str | None] = mapped_column(String(40))
+    razorpay_payment_id: Mapped[str | None] = mapped_column(String(40))
+    razorpay_refund_id: Mapped[str | None] = mapped_column(String(40))
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

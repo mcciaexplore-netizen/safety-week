@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from . import mailer, services
+from . import mailer, razorpay, services
 from . import repositories as repo
 from .admin import COUNTED
 from .auth import Principal, current_principal
@@ -39,11 +39,12 @@ def _order(s: Session, p: Principal, order_id: uuid.UUID) -> Order:
 def _row(s: Session, o: Order) -> dict:
     d = order_out(s, o)
     d["id"] = str(o.id)
+    d["razorpay_payment_id"] = o.razorpay_payment_id
     return d
 
 
 @router.get("")
-def list_orders(s: Sess, p: Me, status: Annotated[str | None, Query(pattern="^(PLACED|READY|PICKED_UP|CANCELLED|EXPIRED|OPEN)$")] = None,
+def list_orders(s: Sess, p: Me, status: Annotated[str | None, Query(pattern="^(PENDING_PAYMENT|PLACED|READY|PICKED_UP|CANCELLED|EXPIRED|OPEN)$")] = None,
                 branch: str | None = None, limit: Annotated[int, Query(ge=1, le=500)] = 200):
     stmt = select(Order).order_by(Order.created_at.desc()).limit(limit)
     if status == "OPEN":
@@ -120,15 +121,27 @@ class CancelIn(BaseModel):
 
 @router.post("/{order_id}/cancel")
 def cancel(order_id: uuid.UUID, body: CancelIn, s: Sess, p: Me):
+    """Cancels an order (stock returns). If the customer already paid online, the full amount is refunded through Razorpay first."""
     if not p.is_admin:
         raise HTTPException(403, "Only an admin can cancel an order")
     o = _order(s, p, order_id)
-    if o.status not in ("PLACED", "READY"):
+    if o.status not in ("PENDING_PAYMENT", "PLACED", "READY"):
         raise HTTPException(409, "This order can no longer be cancelled")
+    refund_id = None
+    if o.payment_status == "PAID" and o.razorpay_payment_id:
+        try:
+            refund_id = razorpay.refund(o.razorpay_payment_id, razorpay.paise(o.total), {"order": o.number, "reason": body.reason.strip()}).get("id")
+        except razorpay.RazorpayError as e:
+            raise HTTPException(502, f"The refund could not be sent through Razorpay ({e}). The order has NOT been cancelled.") from None
     try:
         cancel_order_row(s, o, body.reason.strip(), "CANCELLED", p)
     except services.Conflict as ex:
         raise HTTPException(409, str(ex)) from None
+    if refund_id:
+        o.payment_status, o.razorpay_refund_id = "REFUNDED", refund_id
+        s.commit()
+        mailer.send(mailer.Mail(to=o.customer_email, subject=f"Order {o.number}: refund on its way",
+                                text=f"Hello {o.customer_name},\n\nWe have refunded Rs. {o.total} for order {o.number}. It usually shows in your account within 5-7 working days.\n\nMCCIA"))
     return _row(s, o)
 
 
@@ -152,21 +165,22 @@ def analytics(s: Sess, p: Me):
                coalesce(sum(i.grand_total) FILTER (WHERE o.id IS NOT NULL), 0) AS online_value
           FROM branches b
           LEFT JOIN invoices i ON i.branch_id = b.id AND i.event_id = :e AND i.status = ANY(:counted)
+            AND NOT EXISTS (SELECT 1 FROM orders po WHERE po.invoice_id = i.id AND po.status = 'PENDING_PAYMENT')
           LEFT JOIN orders o ON o.invoice_id = i.id
          GROUP BY b.id ORDER BY b.name"""), args).mappings().all()
     units = s.execute(text("""
         SELECT (o.id IS NOT NULL) AS online, coalesce(sum(ii.quantity), 0) AS units
           FROM invoices i JOIN invoice_items ii ON ii.invoice_id = i.id LEFT JOIN orders o ON o.invoice_id = i.id
-         WHERE i.event_id = :e AND i.status = ANY(:counted) GROUP BY 1"""), args).mappings().all()
+         WHERE i.event_id = :e AND i.status = ANY(:counted) AND (o.id IS NULL OR o.status <> 'PENDING_PAYMENT') GROUP BY 1"""), args).mappings().all()
     daily = s.execute(text("""
         SELECT i.invoice_date AS day, (o.id IS NOT NULL) AS online, sum(i.grand_total) AS value, count(*) AS n
           FROM invoices i LEFT JOIN orders o ON o.invoice_id = i.id
-         WHERE i.event_id = :e AND i.status = ANY(:counted) AND i.invoice_date >= current_date - 29
+         WHERE i.event_id = :e AND i.status = ANY(:counted) AND i.invoice_date >= current_date - 29 AND (o.id IS NULL OR o.status <> 'PENDING_PAYMENT')
          GROUP BY 1, 2 ORDER BY 1"""), args).mappings().all()
     top = s.execute(text("""
         SELECT ii.particulars AS name, sum(ii.quantity) AS units, sum(ii.total_amount) AS value
           FROM orders o JOIN invoices i ON i.id = o.invoice_id AND i.status = ANY(:counted)
-          JOIN invoice_items ii ON ii.invoice_id = i.id WHERE o.event_id = :e
+          JOIN invoice_items ii ON ii.invoice_id = i.id WHERE o.event_id = :e AND o.status <> 'PENDING_PAYMENT'
          GROUP BY ii.particulars ORDER BY value DESC LIMIT 8"""), args).mappings().all()
     status = s.execute(text("SELECT status, count(*) AS n FROM orders WHERE event_id = :e GROUP BY status"), args).mappings().all()
     pay = s.execute(text("SELECT payment_status, count(*) AS n FROM orders WHERE event_id = :e AND status = 'PICKED_UP' GROUP BY 1"), args).mappings().all()

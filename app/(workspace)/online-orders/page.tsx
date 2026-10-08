@@ -15,7 +15,7 @@ import { api } from "@/lib/services/api";
 import type { Order } from "@/lib/store/client";
 
 type Row = Order & { id: string };
-const TABS: [string, string][] = [["OPEN", "To prepare / hand over"], ["READY", "Ready for pick-up"], ["PICKED_UP", "Collected"], ["CANCELLED", "Cancelled"], ["EXPIRED", "Released"]];
+const TABS: [string, string][] = [["OPEN", "To prepare / hand over"], ["PENDING_PAYMENT", "Awaiting payment"], ["READY", "Ready for pick-up"], ["PICKED_UP", "Collected"], ["CANCELLED", "Cancelled"], ["EXPIRED", "Released"]];
 const BRANCHES: [string, string][] = [["", "All branches"], ["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]];
 const MODES: [string, string][] = [["CASH", "Cash"], ["RAZORPAY", "Razorpay (UPI / card)"]];
 const SEL = "h-9 rounded-lg border border-input bg-white px-3 text-sm";
@@ -74,13 +74,13 @@ export default function OnlineOrdersPage() {
                   <td><span className="block font-medium">{o.customer.name}</span><span className="block text-xs text-muted-foreground">{o.customer.phone}</span><span className="block text-xs text-muted-foreground">{o.customer.email}</span></td>
                   <td className="max-w-64"><ul className="space-y-0.5 text-xs">{o.items.map((i) => <li key={i.name}>{i.quantity} × {i.name}</li>)}</ul>{o.note && <p className="mt-1 text-xs italic text-muted-foreground">“{o.note}”</p>}</td>
                   <td className="text-right tabular-nums">{formatRupees(Number(o.total))}</td>
-                  <td>{o.payment_status === "PAID" ? <span className="text-xs font-semibold text-success-fg">Paid</span> : <span className="text-xs font-semibold text-warning">Pay at pick-up</span>}</td>
+                  <td>{o.payment_status === "PAID" ? <span className="text-xs font-semibold text-success-fg">{o.payment_method === "ONLINE" ? "Paid online" : "Paid"}</span> : o.payment_status === "REFUNDED" ? <span className="text-xs font-semibold text-muted-foreground">Refunded</span> : o.payment_method === "ONLINE" ? <span className="text-xs font-semibold text-warning">Awaiting online payment</span> : <span className="text-xs font-semibold text-warning">Pay at pick-up</span>}</td>
                   <td><OrderStatusPill status={o.status} /></td>
                   <td>
-                    {(o.status === "PLACED" || o.status === "READY") && (
+                    {(o.status === "PLACED" || o.status === "READY" || o.status === "PENDING_PAYMENT") && (
                       <div className="flex flex-wrap justify-end gap-2">
                         {o.status === "PLACED" && <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => act(o, "ready")}><PackageCheck data-icon="inline-start" />Mark ready</Button>}
-                        <Button size="sm" onClick={() => setDialog({ kind: "pickup", order: o })}><CheckCheck data-icon="inline-start" />Collected</Button>
+                        {o.status !== "PENDING_PAYMENT" && <Button size="sm" onClick={() => setDialog({ kind: "pickup", order: o })}><CheckCheck data-icon="inline-start" />Collected</Button>}
                         {isAdmin && <Button size="sm" variant="destructive" onClick={() => setDialog({ kind: "cancel", order: o })}><XCircle data-icon="inline-start" />Cancel</Button>}
                       </div>
                     )}
@@ -99,8 +99,8 @@ export default function OnlineOrdersPage() {
           onClose={() => setDialog(null)} />
       )}
       {dialog?.kind === "cancel" && (
-        <EditDialog key={`c-${dialog.order.id}`} title={`Cancel ${dialog.order.number}`} description="The items go back into stock and the customer is e-mailed."
-          fields={[{ key: "reason", label: "Reason", wide: true }]} initial={{ reason: "" }} submitLabel="Cancel order"
+        <EditDialog key={`c-${dialog.order.id}`} title={`Cancel ${dialog.order.number}`} description={dialog.order.payment_status === "PAID" ? `The customer paid ${formatRupees(Number(dialog.order.total))} online: the FULL amount is refunded through Razorpay, the items go back into stock and the customer is e-mailed.` : "The items go back into stock and the customer is e-mailed."}
+          fields={[{ key: "reason", label: "Reason", wide: true }]} initial={{ reason: "" }} submitLabel={dialog.order.payment_status === "PAID" ? "Cancel and refund" : "Cancel order"}
           onSave={async (v) => { await api(`/store-orders/${dialog.order.id}/cancel`, { method: "POST", body: JSON.stringify({ reason: str(v.reason) }) }); list.reload(); }}
           onClose={() => setDialog(null)} />
       )}

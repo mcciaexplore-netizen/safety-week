@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderStatusPill } from "@/components/store/bits";
+import { payForOrder } from "@/lib/store/razorpay";
 import { downloadOrderInvoice, rupees, storeApi, StoreError, useStore, type Order } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +67,15 @@ function OrderView({ number }: { number: string }) {
     catch (e) { window.alert(e instanceof StoreError ? e.message : "Could not cancel."); }
     finally { setBusy(null); }
   }
+  async function payNow() {
+    if (!order) return;
+    setBusy("pay");
+    try {
+      const done = await payForOrder(order, { token, t });
+      if (done) setOrder(done); else setNonce((n) => n + 1);
+    } catch (e) { window.alert(e instanceof Error ? e.message : "The payment could not be completed."); setNonce((n) => n + 1); }
+    finally { setBusy(null); }
+  }
   async function invoice() {
     setBusy("pdf");
     try { await downloadOrderInvoice(number, { token, t, email }); }
@@ -88,6 +98,7 @@ function OrderView({ number }: { number: string }) {
   if (!order) return <Skeleton className="h-64" />;
   const o = order;
   const open = o.status === "PLACED" || o.status === "READY";
+  const awaiting = o.status === "PENDING_PAYMENT";
 
   return (
     <div className="space-y-6">
@@ -102,11 +113,19 @@ function OrderView({ number }: { number: string }) {
 
       <Timeline o={o} />
 
+      {awaiting && (
+        <div className="highlight-box space-y-3 text-sm" data-testid="awaiting-payment">
+          <p>Your order is reserved but <strong>not paid yet</strong>. Complete the payment to confirm it{o.payment ? <> — we hold your items until {fmt(o.payment.pay_until)}</> : null}.</p>
+          <Button onClick={payNow} disabled={busy === "pay"} data-testid="pay-now">
+            {busy === "pay" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}Pay {rupees(o.total)} now
+          </Button>
+        </div>
+      )}
       {open && (
         <div className="highlight-box text-sm">
           {o.status === "READY" ? "Your order is packed and waiting for you." : "We are packing your order — we will e-mail you when it is ready."}{" "}
           Collect it from <strong>{o.branch.name}</strong> within the next few days (held until {fmt(o.hold_until)}).{" "}
-          {o.payment_status === "UNPAID" ? <>Please bring <strong>{rupees(o.total)}</strong> — you pay at the counter.</> : "It is already paid."}
+          {o.payment_status === "UNPAID" ? <>Please bring <strong>{rupees(o.total)}</strong> — you pay at the counter.</> : "It is already paid online - there is nothing to pay at the branch."}
         </div>
       )}
 
@@ -119,7 +138,7 @@ function OrderView({ number }: { number: string }) {
             ))}
           </ul>
           <p className="mt-3 flex justify-between border-t pt-3 font-semibold"><span>Total (incl. GST)</span><span className="tabular-nums" data-testid="order-total">{rupees(o.total)}</span></p>
-          <p className="mt-1 text-xs text-muted-foreground">{o.payment_method === "PAY_AT_PICKUP" ? "Payment: pay at pick-up" : "Payment: paid online"} · {o.payment_status === "PAID" ? "Paid" : "Not yet paid"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{o.payment_method === "PAY_AT_PICKUP" ? "Payment: pay at pick-up" : "Payment: online (Razorpay)"} · {o.payment_status === "PAID" ? "Paid" : o.payment_status === "REFUNDED" ? "Refunded" : "Not yet paid"}</p>
         </section>
         <aside className="glass space-y-3 rounded-xl p-5 text-sm">
           <h2 className="text-lg">Pick-up branch</h2>
@@ -128,7 +147,7 @@ function OrderView({ number }: { number: string }) {
           <Button variant="outline" className="w-full" onClick={invoice} disabled={busy === "pdf"}>
             {busy === "pdf" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Download data-icon="inline-start" />}Download invoice
           </Button>
-          {open && o.payment_status === "UNPAID" && <Button variant="destructive" className="w-full" onClick={cancel} disabled={busy === "cancel"}>Cancel order</Button>}
+          {(open || awaiting) && o.payment_status === "UNPAID" && <Button variant="destructive" className="w-full" onClick={cancel} disabled={busy === "cancel"}>Cancel order</Button>}
         </aside>
       </div>
       <Link href="/store" className="inline-block text-sm font-semibold text-primary">Continue shopping</Link>

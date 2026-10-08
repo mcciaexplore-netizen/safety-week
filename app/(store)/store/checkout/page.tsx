@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnquireButton } from "@/components/store/availability";
+import { payForOrder } from "@/lib/store/razorpay";
 import { cartLines, cartTotals, rupees, storeActions, storeApi, StoreError, useCatalogue, useStore, type Order } from "@/lib/store/client";
 
 export default function CheckoutPage() {
@@ -21,6 +22,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [method, setMethod] = useState<"PAY_AT_PICKUP" | "ONLINE">("PAY_AT_PICKUP");
   const [problem, setProblem] = useState<{ message: string; short?: StoreError["short"] } | null>(null);
 
   if (error) return <div className="mx-auto max-w-3xl px-4 py-16"><ErrorState message={error} onRetry={reload} /></div>;
@@ -39,6 +41,8 @@ export default function CheckoutPage() {
   const emailV = email ?? customer?.email ?? "";
   const phoneV = phone ?? customer?.phone ?? "";
 
+  const online = method === "ONLINE" && data.online_payments;
+
   async function place(e: FormEvent) {
     e.preventDefault();
     if (!branch) { setProblem({ message: "Please choose the branch you will collect from." }); return; }
@@ -48,12 +52,17 @@ export default function CheckoutPage() {
       const order = await storeApi<Order>("/orders", {
         method: "POST",
         body: JSON.stringify({
-          branch_code: branch, name: nameV.trim(), email: emailV.trim(), phone: phoneV.trim(), payment_method: "PAY_AT_PICKUP", note: note.trim(),
+          branch_code: branch, name: nameV.trim(), email: emailV.trim(), phone: phoneV.trim(), payment_method: online ? "ONLINE" : "PAY_AT_PICKUP", note: note.trim(),
           items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
         }),
       }, token);
       storeActions.clear();
-      router.push(`/store/order/${order.number}?t=${encodeURIComponent(order.access_token ?? "")}`);
+      const go = (n: string) => router.push(`/store/order/${n}?t=${encodeURIComponent(order.access_token ?? "")}`);
+      if (online && order.payment) {
+        // the order and its stock are held; Razorpay's own window takes the payment, then our server confirms it
+        try { await payForOrder(order, { token, t: order.access_token }); } catch { /* the order page shows what happened and offers "Pay now" */ }
+      }
+      go(order.number);
     } catch (err) {
       setProblem({ message: err instanceof Error ? err.message : "Could not place the order.", short: err instanceof StoreError ? err.short : undefined });
       setBusy(false);
@@ -103,16 +112,24 @@ export default function CheckoutPage() {
           <section className="glass space-y-4 rounded-xl p-5 sm:p-6">
             <h2 className="text-lg">3. How will you pay?</h2>
             <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-primary bg-white/70 p-4 ring-[3px] ring-primary/10">
-                <input type="radio" name="pay" checked readOnly className="mt-1" />
+              <label className={`flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition-all duration-200 ${method === "PAY_AT_PICKUP" ? "border-primary ring-[3px] ring-primary/10" : "hover:border-primary/40"}`}>
+                <input type="radio" name="pay" value="PAY_AT_PICKUP" checked={method === "PAY_AT_PICKUP"} onChange={() => setMethod("PAY_AT_PICKUP")} className="mt-1" />
                 <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><Banknote className="size-4 text-primary" />Pay at pick-up</span>
                   <span className="block text-xs text-muted-foreground">Pay at the branch counter when you collect — by cash, or by UPI / card through Razorpay.</span></span>
               </label>
-              <label className="flex gap-3 rounded-xl border border-dashed bg-muted/50 p-4 opacity-70">
-                <input type="radio" name="pay" disabled className="mt-1" />
-                <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4" />Pay online with Razorpay <span className="rounded-full bg-primary/10 px-2 text-[0.65rem] font-bold uppercase text-primary">Coming soon</span></span>
-                  <span className="block text-xs text-muted-foreground">UPI, cards and net banking — pay now and just collect.</span></span>
-              </label>
+              {data.online_payments ? (
+                <label className={`flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition-all duration-200 ${method === "ONLINE" ? "border-primary ring-[3px] ring-primary/10" : "hover:border-primary/40"}`}>
+                  <input type="radio" name="pay" value="ONLINE" checked={method === "ONLINE"} onChange={() => setMethod("ONLINE")} className="mt-1" data-testid="pay-online" />
+                  <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4 text-primary" />Pay online with Razorpay</span>
+                    <span className="block text-xs text-muted-foreground">UPI, cards and net banking in Razorpay&apos;s secure window — pay now and just collect.</span></span>
+                </label>
+              ) : (
+                <label className="flex gap-3 rounded-xl border border-dashed bg-muted/50 p-4 opacity-70">
+                  <input type="radio" name="pay" disabled className="mt-1" />
+                  <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4" />Pay online with Razorpay <span className="rounded-full bg-primary/10 px-2 text-[0.65rem] font-bold uppercase text-primary">Coming soon</span></span>
+                    <span className="block text-xs text-muted-foreground">UPI, cards and net banking — pay now and just collect.</span></span>
+                </label>
+              )}
             </div>
           </section>
         </div>
@@ -135,10 +152,10 @@ export default function CheckoutPage() {
             </div>
           )}
           <Button type="submit" size="lg" className="w-full" disabled={busy || !data.open || !branch} data-testid="place-order">
-            {busy && <Loader2 className="animate-spin" data-icon="inline-start" />}Place order
+            {busy && <Loader2 className="animate-spin" data-icon="inline-start" />}{online ? `Pay ${rupees(t.total)} online` : "Place order"}
           </Button>
           {!data.open && <p className="text-xs text-warning">The store is not taking orders right now.</p>}
-          <p className="text-xs text-muted-foreground">Your order is held for {data.pickup_hold_days ?? 3} days. You will get an e-mail with your invoice straight away.</p>
+          <p className="text-xs text-muted-foreground">{online ? "After paying, your invoice is e-mailed to you and your order is packed for pick-up." : `Your order is held for ${data.pickup_hold_days ?? 3} days. You will get an e-mail with your invoice straight away.`}</p>
         </aside>
       </div>
     </form>

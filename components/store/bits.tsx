@@ -74,6 +74,7 @@ export function QtyStepper({ value, onChange, max, label }: { value: number; onC
 }
 
 const STATUS: Record<OrderStatus, { label: string; cls: string }> = {
+  PENDING_PAYMENT: { label: "Awaiting payment", cls: "border-warning/30 bg-warning/10 text-warning" },
   PLACED: { label: "Order placed", cls: "border-primary/20 bg-primary/10 text-primary" },
   READY: { label: "Ready for pick-up", cls: "border-success/30 bg-success/10 text-success-fg" },
   PICKED_UP: { label: "Collected", cls: "border-border bg-muted text-muted-foreground" },

@@ -14,9 +14,10 @@ export interface Catalogue {
   pickup_hold_days?: number; online_payments?: boolean;
 }
 export interface Customer { id: string; email: string; name: string; phone: string }
-export type OrderStatus = "PLACED" | "READY" | "PICKED_UP" | "CANCELLED" | "EXPIRED";
+export type OrderStatus = "PENDING_PAYMENT" | "PLACED" | "READY" | "PICKED_UP" | "CANCELLED" | "EXPIRED";
 export interface Order {
-  number: string; status: OrderStatus; payment_method: "PAY_AT_PICKUP" | "ONLINE"; payment_status: "UNPAID" | "PAID";
+  number: string; status: OrderStatus; payment_method: "PAY_AT_PICKUP" | "ONLINE"; payment_status: "UNPAID" | "PAID" | "REFUNDED";
+  paid_at?: string | null; payment?: { key_id: string; razorpay_order_id: string; amount: number; currency: string; pay_until: string } | null;
   branch: Branch; total: string; item_count: number; note: string; created_at: string; ready_at: string | null;
   picked_up_at: string | null; hold_until: string; access_token?: string;
   customer: { name: string; email: string; phone: string };

@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import documents, mailer, services
+from . import documents, mailer, razorpay, services
 from . import repositories as repo
 from .auth import Principal
 from .config import settings
@@ -45,7 +45,6 @@ MAX_QTY = 1_000_000  # no practical limit on how much can go in a cart: the bran
 CODE_TTL_MIN = 10
 CODE_TRIES = 5
 CODES_PER_HOUR = 5
-ONLINE_PAYMENTS = False  # flipped on when the Razorpay step is built
 
 
 # ---------------------------------------------------------------- helpers
@@ -125,6 +124,9 @@ def _need_customer(s: Session, authorization: str | None) -> Customer:
 @router.get("/catalogue")
 def catalogue(s: Sess):
     """Everything the shop front needs in one call: products, categories, branches and the stock at each branch."""
+    from .store_pay import expire_unpaid  # local import: store_pay imports this module
+
+    expire_unpaid(s)
     e = repo.current_event(s)
     branches = list(s.scalars(select(Branch).where(Branch.active).order_by(Branch.name)))
     if e is None:
@@ -146,7 +148,7 @@ def catalogue(s: Sess):
     cats = sorted({p["category"] for p in out})
     return {"open": e.status == "OPEN", "event": e.name, "year": e.year, "branches": [_branch_out(b) for b in branches],
             "categories": cats, "products": out, "pickup_hold_days": settings.pickup_hold_days,
-            "online_payments": ONLINE_PAYMENTS}
+            "online_payments": razorpay.enabled()}
 
 
 # ---------------------------------------------------------------- sign-in by e-mail code
@@ -238,6 +240,8 @@ class OrderIn(BaseModel):
 
 
 def order_out(s: Session, o: Order, *, token: bool = False) -> dict:
+    from .store_pay import payment_info  # local import: store_pay imports this module
+
     inv = s.get(Invoice, o.invoice_id)
     branch = s.get(Branch, o.branch_id)
     out = {
@@ -247,6 +251,8 @@ def order_out(s: Session, o: Order, *, token: bool = False) -> dict:
         "created_at": o.created_at.isoformat(), "ready_at": o.ready_at.isoformat() if o.ready_at else None,
         "picked_up_at": o.picked_up_at.isoformat() if o.picked_up_at else None,
         "hold_until": (o.created_at + timedelta(days=settings.pickup_hold_days)).isoformat(),
+        "paid_at": o.paid_at.isoformat() if o.paid_at else None,
+        "payment": payment_info(o),
         "items": [{"name": _clean(i.particulars), "quantity": i.quantity, "rate": f"{i.rate:.2f}", "amount": f"{i.total_amount:.2f}"}
                   for i in inv.items],
     }
@@ -293,6 +299,9 @@ def availability(body: AvailIn, s: Sess):
     """LIVE stock, read from the database at this very moment, for the branch the shopper chose: how many it really has
     (that number is the most they can put in the cart for that branch) and what the other branches have right now.
     Called when a shopper adds to the cart or changes a quantity."""
+    from .store_pay import expire_unpaid
+
+    expire_unpaid(s)
     e = repo.current_event(s)
     if e is None:
         raise HTTPException(409, "The store is closed at the moment")
@@ -316,8 +325,11 @@ def availability(body: AvailIn, s: Sess):
 
 @router.post("/orders", status_code=201)
 def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Header()] = None):
-    if body.payment_method == "ONLINE" and not ONLINE_PAYMENTS:
+    from .store_pay import expire_unpaid
+
+    if body.payment_method == "ONLINE" and not razorpay.enabled():
         raise HTTPException(409, "Online payment is not available yet - please choose pay at pick-up")
+    expire_unpaid(s)
     e = _event_open(s)
     branch = _branch(s, body.branch_code.upper())
     customer = _customer_from(s, authorization)
@@ -362,7 +374,8 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
         company_name=body.name.strip(), address=f"Pick-up at {branch.name}", email=email, contact_person=body.name.strip(),
         contact_phone=body.phone.strip(), invoice_date=_today_ist(), discount_percent=Decimal(0),
         items=[InvoiceItemIn(product_id=l.product_id, quantity=l.quantity) for l in body.items], payments=[],
-        payment_details="ONLINE ORDER - Pay at pick-up" + (f" | Note: {body.note.strip()}" if body.note.strip() else ""),
+        payment_details=("ONLINE ORDER - Paying online (Razorpay)" if body.payment_method == "ONLINE" else "ONLINE ORDER - Pay at pick-up")
+        + (f" | Note: {body.note.strip()}" if body.note.strip() else ""),
         action="submit")
     try:
         invoice = services.create_invoice(s, p, data, None)
@@ -371,15 +384,26 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
         raise HTTPException(422, str(ex)) from None
     order = Order(id=uuid.uuid4(), number=invoice.invoice_number, invoice_id=invoice.id, branch_id=branch.id, event_id=e.id,
                   customer_id=customer.id if customer else None, customer_name=body.name.strip(), customer_email=email,
-                  customer_phone=body.phone.strip(), status="PLACED", payment_method=body.payment_method,
+                  customer_phone=body.phone.strip(), status="PENDING_PAYMENT" if body.payment_method == "ONLINE" else "PLACED", payment_method=body.payment_method,
                   payment_status="UNPAID", note=body.note.strip(), total=invoice.grand_total,
                   item_count=sum(i.quantity for i in invoice.items))
     s.add(order)
     s.commit()
-    try:
-        _notify_placed(s, order, p)
-    except Exception:
-        log.exception("order e-mail failed for %s", order.number)
+    if body.payment_method == "ONLINE":
+        # the stock is held by the invoice; now open the payment with Razorpay (amount is OUR total, in paise)
+        try:
+            rz = razorpay.create_order(razorpay.paise(order.total), order.number, {"order": order.number, "branch": branch.code})
+        except razorpay.RazorpayError:
+            log.exception("could not create the Razorpay order for %s", order.number)
+            cancel_order_row(s, order, "Online payment could not be started", "CANCELLED", notify=False)
+            raise HTTPException(502, "Online payment is not available right now. Please try again, or choose pay at pick-up.") from None
+        order.razorpay_order_id = rz["id"]
+        s.commit()
+    else:
+        try:
+            _notify_placed(s, order, p)
+        except Exception:
+            log.exception("order e-mail failed for %s", order.number)
     return order_out(s, order, token=True)
 
 
@@ -405,6 +429,9 @@ def _order_for(s: Session, number: str, authorization: str | None, t: str | None
 @router.get("/orders/{number}")
 def get_order(number: str, s: Sess, authorization: Annotated[str | None, Header()] = None,
               t: Annotated[str | None, Query(max_length=1000)] = None, email: Annotated[str | None, Query(max_length=320)] = None):
+    from .store_pay import expire_unpaid
+
+    expire_unpaid(s)
     return order_out(s, _order_for(s, number, authorization, t, email))
 
 
@@ -426,18 +453,20 @@ def cancel_order(number: str, s: Sess, authorization: Annotated[str | None, Head
                  t: Annotated[str | None, Query(max_length=1000)] = None, email: Annotated[str | None, Query(max_length=320)] = None):
     """The shopper changes their mind before collecting (and before paying)."""
     o = _order_for(s, number, authorization, t, email)
-    if o.status not in ("PLACED", "READY") or o.payment_status == "PAID":
+    if o.status not in ("PENDING_PAYMENT", "PLACED", "READY") or o.payment_status != "UNPAID":
         raise HTTPException(409, "This order can no longer be cancelled here. Please contact the branch.")
     cancel_order_row(s, o, "Cancelled by the customer", "CANCELLED")
     return order_out(s, o)
 
 
-def cancel_order_row(s: Session, o: Order, reason: str, status: str, principal: Principal | None = None) -> None:
+def cancel_order_row(s: Session, o: Order, reason: str, status: str, principal: Principal | None = None, notify: bool = True) -> None:
     """Cancels the invoice (stock returns), marks the order and tells the shopper. Used by shoppers, staff and the clean-up job."""
     p = principal or _system_principal(None, admin=True)
     services.cancel_invoice(s, p, o.invoice_id, reason)
     o.status, o.cancelled_at, o.updated_at = status, _now(), _now()
     s.commit()
+    if not notify:
+        return
     mailer.send(mailer.Mail(
         to=o.customer_email, subject=f"Order {o.number} {'cancelled' if status == 'CANCELLED' else 'released'}",
         text=f"Hello {o.customer_name},\n\nYour order {o.number} has been {'cancelled' if status == 'CANCELLED' else 'released'} ({reason}).\n"
