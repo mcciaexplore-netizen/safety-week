@@ -7,10 +7,13 @@ test("full shell flow: landing to branch workspace, history, edit, isolation, si
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
-  // the first page of the site is the branch picker itself
+  // the first page of the site is the store; staff reach the branch picker from its "Sign in" menu
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Select your branch" })).toBeVisible();
-  await page.screenshot({ path: "test-results/01-landing.png", fullPage: true });
+  await expect(page).toHaveURL(/\/store$/);
+  await page.getByRole("button", { name: /Sign in/ }).click();
+  await expect(page.getByRole("menuitem", { name: /User sign in/ })).toBeVisible();
+  await page.getByRole("menuitem", { name: /Authority sign in/ }).click();
+  await expect(page).toHaveURL(/select-branch/);
   for (const b of BRANCHES) await expect(page.getByRole("heading", { name: b }).or(page.getByText(b, { exact: true }).first())).toBeVisible();
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/Sadar|Bhusari/);

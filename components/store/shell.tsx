@@ -1,13 +1,54 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, ShoppingCart, UserRound } from "lucide-react";
+import { ChevronDown, ShieldCheck, ShoppingBag, Search, ShoppingCart, UserRound } from "lucide-react";
 import { MCCIALogo } from "@/components/brand/logo";
 import { API_MODE } from "@/lib/services";
 import { storeActions, useCatalogue, useStore } from "@/lib/store/client";
 import { BranchSelect } from "./bits";
+
+/** Top-right "Sign in": shoppers go to their account, MCCIA staff go to the branch sign-in. */
+function SignInMenu({ signedIn, label }: { signedIn: boolean; label: string }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+
+  if (signedIn)
+    return (
+      <Link href="/store/account" className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-primary">
+        <UserRound className="size-4" /><span className="hidden sm:inline">{label}</span>
+      </Link>
+    );
+  return (
+    <div ref={box} className="relative">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+        className="inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-primary">
+        <UserRound className="size-4" /><span className="hidden sm:inline">Sign in</span><ChevronDown className="size-3.5" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border bg-white p-1.5 shadow-card-hover">
+          <Link role="menuitem" href="/store/account" onClick={() => setOpen(false)} className="flex gap-3 rounded-lg p-3 hover:bg-accent">
+            <ShoppingBag className="mt-0.5 size-4 shrink-0 text-primary" />
+            <span><span className="block text-sm font-semibold">User sign in</span><span className="block text-xs text-muted-foreground">Shop, track and re-order</span></span>
+          </Link>
+          <Link role="menuitem" href="/select-branch" onClick={() => setOpen(false)} className="flex gap-3 rounded-lg p-3 hover:bg-accent">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+            <span><span className="block text-sm font-semibold">Authority sign in</span><span className="block text-xs text-muted-foreground">MCCIA branch and admin staff</span></span>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function StoreShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -48,10 +89,7 @@ export function StoreShell({ children }: { children: React.ReactNode }) {
                 <BranchSelect branches={data.branches} value={branch} onChange={storeActions.setBranch} />
               </label>
             )}
-            <Link href="/store/account" className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-primary">
-              <UserRound className="size-4" />
-              <span className="hidden sm:inline">{ready && customer ? (customer.name || customer.email.split("@")[0]) : "Sign in"}</span>
-            </Link>
+            <SignInMenu signedIn={ready && !!customer} label={customer ? (customer.name || customer.email.split("@")[0]) : "Sign in"} />
             <Link href="/store/cart" aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}
               className="relative inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-primary">
               <ShoppingCart className="size-5" />
