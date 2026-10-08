@@ -71,19 +71,29 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   // cart and checkout: Hadapsar cannot supply it, Tilak Road can
   await page.goto("/store/cart");
   await expect(page.getByTestId("cart-total")).toHaveText("₹472.00"); // 2 x 236
-  await page.getByRole("link", { name: "Continue to checkout" }).click();
-  // nothing about stock is shown on the branch cards; the check happens when the shopper tries to place the order
-  await expect(page.getByTestId("branch-HAD")).not.toContainText("stock");
+  await page.getByRole("button", { name: "Continue to checkout" }).click();
+  // checkout only shows the branch chosen in the cart (it cannot be changed here)
+  await expect(page.getByTestId("branch-TIL")).toBeVisible();
+  await expect(page.getByTestId("branch-HAD")).toHaveCount(0);
+  await expect(page.getByRole("radio")).toHaveCount(2);                                     // only the two payment choices
+  // go back, pick Hadapsar (which has none), and try to order: the server explains and suggests Tilak Road
+  await page.getByTestId("change-branch").click();
+  await page.locator("#cart-branch").selectOption("HAD");
+  await page.getByRole("button", { name: "Continue to checkout" }).click();
   await page.getByLabel("Full name").fill("Meera Shopper");
   await page.getByLabel("Mobile number").fill("9822001111");
   await page.getByLabel(/^E-mail/).fill(`meera.${Date.now()}@example.com`);
-  await page.getByTestId("branch-HAD").click();
   await expect(page.getByTestId("enquire-now")).toHaveCount(0);                                   // never shown unless something is out of stock
   await page.getByTestId("place-order").click();
   await expect(page.getByTestId("checkout-error")).toContainText("collect it from Tilak Road");
-  await expect(page.getByTestId("checkout-error").getByTestId("enquire-now")).toBeVisible();   // only a branch that really has it is suggested
   await expect(page.getByTestId("checkout-error")).not.toContainText("Bhosari");
-  await page.getByTestId("branch-TIL").click();
+  await expect(page.getByTestId("checkout-error").getByTestId("enquire-now")).toBeVisible();
+  await page.getByTestId("change-branch").click();
+  await page.locator("#cart-branch").selectOption("TIL");
+  await page.getByRole("button", { name: "Continue to checkout" }).click();
+  await page.getByLabel("Full name").fill("Meera Shopper");
+  await page.getByLabel("Mobile number").fill("9822001111");
+  await page.getByLabel(/^E-mail/).fill(`meera.${Date.now()}@example.com`);
   await expect(page.getByText("Pay at pick-up").first()).toBeVisible();
   await expect(page.getByText("Coming soon")).toBeVisible();
   await page.getByTestId("place-order").click();

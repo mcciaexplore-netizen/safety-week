@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnquireButton } from "@/components/store/availability";
 import { cartLines, cartTotals, rupees, storeActions, storeApi, StoreError, useCatalogue, useStore, type Order } from "@/lib/store/client";
-import { cn } from "@/lib/utils";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -35,6 +34,7 @@ export default function CheckoutPage() {
       </div>
     );
   const t = cartTotals(lines);
+  const chosen = data.branches.find((b) => b.code === branch) ?? null;
   const nameV = name ?? customer?.name ?? "";
   const emailV = email ?? customer?.email ?? "";
   const phoneV = phone ?? customer?.phone ?? "";
@@ -66,22 +66,25 @@ export default function CheckoutPage() {
       <h1 className="mb-6 text-[clamp(1.8rem,3.5vw,2.5rem)] font-extrabold">Checkout</h1>
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
-          <section className="glass space-y-4 rounded-xl p-5 sm:p-6">
-            <h2 className="text-lg">1. Where will you collect from?</h2>
-            <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Pick-up branch">
-              {data.branches.map((b) => {
-                return (
-                  <label key={b.code} data-testid={`branch-${b.code}`} className={cn("flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition-all duration-200 hover:border-primary/40",
-                    branch === b.code && "border-primary ring-[3px] ring-primary/10")}>
-                    <input type="radio" name="branch" className="mt-1" checked={branch === b.code} onChange={() => storeActions.setBranch(b.code)} />
-                    <span className="min-w-0 text-sm">
-                      <span className="flex items-center gap-1 font-heading font-bold"><MapPin className="size-4 text-primary" />{b.name}</span>
-                      <span className="block text-xs text-muted-foreground">{b.address}</span>
-                    </span>
-                  </label>
-                );
-              })}
+          <section className="glass space-y-3 rounded-xl p-5 sm:p-6">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-lg">1. Pick-up branch</h2>
+              <Link href="/store/cart" className="text-sm font-semibold text-primary" data-testid="change-branch">Change in cart</Link>
             </div>
+            {chosen ? (
+              <div className="flex gap-3 rounded-xl border border-primary bg-white/70 p-4 ring-[3px] ring-primary/10" data-testid={`branch-${chosen.code}`}>
+                <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
+                <div className="min-w-0 text-sm">
+                  <p className="font-heading font-bold">{chosen.name}</p>
+                  <p className="text-xs text-muted-foreground">{chosen.address}</p>
+                  {chosen.phone && <p className="text-xs text-muted-foreground">{chosen.phone}</p>}
+                </div>
+              </div>
+            ) : (
+              <p role="alert" className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+                Please choose your pick-up branch in the <Link href="/store/cart" className="font-semibold underline">cart</Link> first, so we can check its live stock.
+              </p>
+            )}
           </section>
 
           <section className="glass space-y-4 rounded-xl p-5 sm:p-6">

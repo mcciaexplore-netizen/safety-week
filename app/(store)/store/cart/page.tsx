@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ShoppingBag, Trash2 } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { cartLines, cartTotals, checkAvailability, gstPrice, rupees, setQtyCheck
 
 export default function CartPage() {
   const { data, error, reload } = useCatalogue();
+  const router = useRouter();
   const { cart, branch, ready } = useStore();
   const [notes, setNotes] = useState<Record<string, Availability>>({});
   const [needBranch, setNeedBranch] = useState(false);
@@ -100,7 +102,8 @@ export default function CartPage() {
             <span className="font-medium">Collect from</span>
             <BranchSelect id="cart-branch" branches={data.branches} value={branch} onChange={storeActions.setBranch} className="w-full" />
           </label>
-          <Link href="/store/checkout" className="block"><Button size="lg" className="w-full">Continue to checkout</Button></Link>
+          <Button size="lg" className="w-full" onClick={() => (branch ? router.push("/store/checkout") : setNeedBranch(true))}>Continue to checkout</Button>
+          {!branch && needBranch && <p role="alert" className="text-xs font-semibold text-danger">Choose the branch you will collect from first.</p>}
           <Link href="/store" className="block text-center text-sm font-semibold text-primary">Keep shopping</Link>
         </aside>
       </div>
