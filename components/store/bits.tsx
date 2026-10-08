@@ -104,23 +104,16 @@ export function ProductLink({ product, children, className }: { product: Product
   return <Link href={`/store/p/${product.slug}`} className={className}>{children}</Link>;
 }
 
-/** Stock at every branch on one line each, so the shopper can compare and pick where to collect from. Click a branch to choose it. */
-export function BranchStockChips({ stock, branches, selected, onPick }: { stock: Record<string, number>; branches: Branch[]; selected: string | null; onPick: (code: string) => void }) {
-  return (
-    <ul className="mt-1 grid grid-cols-2 gap-1" aria-label="Stock at each branch" data-testid="stock-chips">
-      {branches.map((b) => {
-        const n = stock[b.code] ?? 0;
-        return (
-          <li key={b.code}>
-            <button type="button" onClick={() => onPick(b.code)} aria-pressed={selected === b.code} title={`${b.name}: ${n > 0 ? `${n} in stock` : "out of stock"} - click to collect from here`}
-              className={cn("flex w-full items-center justify-between gap-1 rounded-md border px-2 py-1 text-left text-[0.7rem] leading-tight transition-colors duration-200 hover:border-primary/50",
-                selected === b.code ? "border-primary bg-primary/5" : "bg-white/70")}>
-              <span className="truncate font-medium">{b.name}</span>
-              <span className={cn("shrink-0 font-bold tabular-nums", n === 0 ? "text-danger" : n <= 5 ? "text-warning" : "text-success-fg")}>{n}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
+/** What a shopper is told about stock: nothing when there is plenty - only "Low stock" or "Out of stock" for the chosen branch. */
+export function StockNote({ product, branches, branch }: { product: Product; branches: Branch[]; branch: string | null }) {
+  const status = Object.values(product.stock_status);
+  let text: string | null = null;
+  let kind: "OUT" | "LOW" = "OUT";
+  if (branch) {
+    const s = product.stock_status[branch];
+    const name = branches.find((b) => b.code === branch)?.name;
+    if (s === "OUT") text = `Out of stock at ${name}`;
+    else if (s === "LOW") { text = `Low stock at ${name}`; kind = "LOW"; }
+  } else if (status.length > 0 && status.every((s) => s === "OUT")) text = "Out of stock";
+  return <p className="min-h-5 text-xs font-semibold" data-testid="stock-note">{text && <span className={kind === "OUT" ? "text-danger" : "text-warning"}>{text}</span>}</p>;
 }

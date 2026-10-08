@@ -60,6 +60,7 @@ def test_catalogue_shows_stock_per_branch(client, people, prods):
     assert cat["open"] and {b["code"] for b in cat["branches"]} == {"SBR", "TIL", "BHO", "HAD", "AHL"}
     badges = next(p for p in cat["products"] if p["name"] == "Coffee Mugs")
     assert badges["stock"]["TIL"] == 10 and badges["stock"]["HAD"] == 0
+    assert badges["stock_status"]["TIL"] == "OK" and badges["stock_status"]["HAD"] == "OUT" and badges["stock_status"]["SBR"] == "OUT"
     assert badges["rate"] == "200.00" and badges["price_incl_gst"] == "236.00" and badges["gst_percent"] == "18.00"   # 200 x 1.18
     assert badges["category"] == "Gifts & Accessories" and badges["slug"] == "coffee-mugs"
     assert len(cat["products"]) == 39 and "T-Shirts" in cat["categories"]

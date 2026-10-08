@@ -6,7 +6,7 @@ import { ArrowLeft, Check, ShoppingCart } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockLine } from "@/components/store/bits";
+import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockNote } from "@/components/store/bits";
 import { storeActions, useCatalogue, useStore } from "@/lib/store/client";
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -16,7 +16,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const p = data?.products.find((x) => x.slug === slug);
-  const branchName = data?.branches.find((b) => b.code === branch)?.name;
 
   if (error) return <div className="mx-auto max-w-3xl px-4 py-16"><ErrorState message={error} onRetry={reload} /></div>;
   if (!data) return <div className="mx-auto max-w-5xl px-4 py-12"><Skeleton className="h-96" /></div>;
@@ -26,7 +25,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       <Link href="/store" className="mt-4 inline-block font-semibold text-primary">Back to the store</Link>
     </div>
   );
-  const here = branch ? p.stock[branch] ?? 0 : null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -43,7 +41,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             <label className="flex flex-wrap items-center gap-2 text-sm">Collect from
               <BranchSelect branches={data.branches} value={branch} onChange={storeActions.setBranch} />
             </label>
-            {here !== null && <StockLine qty={here} branchName={branchName} />}
+            <StockNote product={p} branches={data.branches} branch={branch} />
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <QtyStepper value={qty} onChange={(n) => setQty(Math.max(1, n))} label="Quantity" />
               <Button size="lg" onClick={() => { storeActions.add(p.id, qty); setAdded(true); setTimeout(() => setAdded(false), 2000); }}>
@@ -53,15 +51,19 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             </div>
           </div>
 
-          <h2 className="mt-8 text-lg">Stock at our branches</h2>
-          <ul className="mt-3 divide-y rounded-xl border bg-white/60" data-testid="branch-stock">
-            {data.branches.map((b) => (
-              <li key={b.code} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className={b.code === branch ? "font-semibold text-primary" : ""}>{b.name}</span>
-                <StockLine qty={p.stock[b.code] ?? 0} />
-              </li>
-            ))}
-          </ul>
+          {data.branches.some((b) => p.stock_status[b.code] !== "OK") && (
+            <>
+              <h2 className="mt-8 text-lg">Good to know</h2>
+              <ul className="mt-3 divide-y rounded-xl border bg-white/60" data-testid="branch-stock">
+                {data.branches.filter((b) => p.stock_status[b.code] !== "OK").map((b) => (
+                  <li key={b.code} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                    <span>{b.name}</span>
+                    <span className={p.stock_status[b.code] === "OUT" ? "text-xs font-semibold text-danger" : "text-xs font-semibold text-warning"}>{p.stock_status[b.code] === "OUT" ? "Out of stock" : "Low stock"}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       </div>
     </div>

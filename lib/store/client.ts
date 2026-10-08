@@ -7,7 +7,7 @@ import { API_URL } from "@/lib/services/api";
 export interface Branch { code: string; name: string; address: string; phone: string }
 export interface Product {
   id: string; slug: string; name: string; category: string; image_url: string; best_seller: boolean; unit: string; hsn_code: string;
-  rate: string; gst_percent: string; price_incl_gst: string; stock: Record<string, number>;
+  rate: string; gst_percent: string; price_incl_gst: string; stock: Record<string, number>; stock_status: Record<string, "OK" | "LOW" | "OUT">;
 }
 export interface Catalogue {
   open: boolean; event?: string; year?: number; branches: Branch[]; categories: string[]; products: Product[];

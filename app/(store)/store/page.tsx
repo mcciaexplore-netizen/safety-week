@@ -6,7 +6,7 @@ import { ShoppingCart, Star } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BestSellerTag, BranchSelect, BranchStockChips, PriceBlock, ProductImage, ProductLink } from "@/components/store/bits";
+import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, ProductLink, StockNote } from "@/components/store/bits";
 import { storeActions, useCatalogue, useStore, type Branch, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +89,7 @@ function Shop() {
 }
 
 function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Branch[]; branch: string | null; inCart: number }) {
-  const total = Object.values(p.stock).reduce((a, b) => a + b, 0);
+  const total = Object.values(p.stock).reduce((a, b) => a + b, 0); // only decides whether the button works
   return (
     <li className="card-lift glass flex flex-col rounded-xl p-4" data-testid="product-card">
       <ProductLink product={p} className="block">
@@ -101,8 +101,7 @@ function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Br
         <h3 className="mt-1 line-clamp-2 min-h-[2.5rem] font-heading text-base leading-snug font-bold">{p.name}</h3>
       </ProductLink>
       <PriceBlock product={p} className="mt-2" />
-      <p className="label-xs mt-3">Stock at each branch</p>
-      <BranchStockChips stock={p.stock} branches={branches} selected={branch} onPick={storeActions.setBranch} />
+      <StockNote product={p} branches={branches} branch={branch} />
       <div className="mt-auto pt-4">
         <Button className="w-full" variant={inCart ? "outline" : "default"} disabled={total === 0} onClick={() => storeActions.add(p.id)} aria-label={`Add ${p.name} to cart`}>
           <ShoppingCart data-icon="inline-start" />{inCart ? `In cart (${inCart}) · add one more` : "Add to cart"}

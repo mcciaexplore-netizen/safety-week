@@ -131,7 +131,8 @@ def catalogue(s: Sess):
         return {"open": False, "branches": [_branch_out(b) for b in branches], "categories": [], "products": []}
     prods = list(s.scalars(select(Product).where(Product.event_id == e.id, Product.active, Product.online_enabled)
                            .order_by(Product.line_order)))
-    stock = {b.code: {i.product_id: i.remaining for i in levels(s, b, e)} for b in branches}
+    lv = {b.code: {i.product_id: i for i in levels(s, b, e)} for b in branches}
+    stock = {code: {pid: i.remaining for pid, i in d.items()} for code, d in lv.items()}
     out = []
     for p in prods:
         out.append({
@@ -140,6 +141,8 @@ def catalogue(s: Sess):
             "rate": str(p.current_rate), "gst_percent": str(p.cgst_rate + p.sgst_rate), "price_incl_gst": str(_price_incl_gst(p)),
             # None (stock not set up) counts as 0 for shoppers
             "stock": {code: max(0, min(999, st.get(p.id) or 0)) for code, st in stock.items()},
+            # what the shop shows: nothing when there is plenty, "Low stock" or "Out of stock" otherwise
+            "stock_status": {code: ("OUT" if (st.get(p.id) or 0) <= 0 else lv[code][p.id].status) for code, st in stock.items()},
         })
     cats = sorted({p["category"] for p in out})
     return {"open": e.status == "OPEN", "event": e.name, "year": e.year, "branches": [_branch_out(b) for b in branches],
