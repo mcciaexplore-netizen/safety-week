@@ -41,7 +41,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             <label className="flex flex-wrap items-center gap-2 text-sm">Collect from
               <BranchSelect branches={data.branches} value={branch} onChange={storeActions.setBranch} />
             </label>
-            <StockNote product={p} branches={data.branches} branch={branch} />
+            <StockNote product={p} branch={branch} />
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <QtyStepper value={qty} onChange={(n) => setQty(Math.max(1, n))} label="Quantity" />
               <Button size="lg" onClick={() => { storeActions.add(p.id, qty); setAdded(true); setTimeout(() => setAdded(false), 2000); }}>
@@ -51,19 +51,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             </div>
           </div>
 
-          {data.branches.some((b) => p.stock_status[b.code] !== "OK") && (
-            <>
-              <h2 className="mt-8 text-lg">Good to know</h2>
-              <ul className="mt-3 divide-y rounded-xl border bg-white/60" data-testid="branch-stock">
-                {data.branches.filter((b) => p.stock_status[b.code] !== "OK").map((b) => (
-                  <li key={b.code} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                    <span>{b.name}</span>
-                    <span className={p.stock_status[b.code] === "OUT" ? "text-xs font-semibold text-danger" : "text-xs font-semibold text-warning"}>{p.stock_status[b.code] === "OUT" ? "Out of stock" : "Low stock"}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
         </div>
       </div>
     </div>

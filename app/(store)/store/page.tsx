@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, ProductLink, StockNote } from "@/components/store/bits";
-import { storeActions, useCatalogue, useStore, type Branch, type Product } from "@/lib/store/client";
+import { storeActions, useCatalogue, useStore, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 
@@ -80,7 +80,7 @@ function Shop() {
           <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">Nothing matches. Try another category or search.</p>
         ) : (
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4" data-testid="product-grid">
-            {products.map((p) => <ProductCard key={p.id} p={p} branches={data.branches} branch={branch} inCart={cart[p.id] ?? 0} />)}
+            {products.map((p) => <ProductCard key={p.id} p={p} branch={branch} inCart={cart[p.id] ?? 0} />)}
           </ul>
         )}
       </section>
@@ -88,7 +88,7 @@ function Shop() {
   );
 }
 
-function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Branch[]; branch: string | null; inCart: number }) {
+function ProductCard({ p, branch, inCart }: { p: Product; branch: string | null; inCart: number }) {
   const total = Object.values(p.stock).reduce((a, b) => a + b, 0); // only decides whether the button works
   return (
     <li className="card-lift glass flex flex-col rounded-xl p-4" data-testid="product-card">
@@ -101,7 +101,7 @@ function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Br
         <h3 className="mt-1 line-clamp-2 min-h-[2.5rem] font-heading text-base leading-snug font-bold">{p.name}</h3>
       </ProductLink>
       <PriceBlock product={p} className="mt-2" />
-      <StockNote product={p} branches={branches} branch={branch} />
+      <StockNote product={p} branch={branch} />
       <div className="mt-auto pt-4">
         <Button className="w-full" variant={inCart ? "outline" : "default"} disabled={total === 0} onClick={() => storeActions.add(p.id)} aria-label={`Add ${p.name} to cart`}>
           <ShoppingCart data-icon="inline-start" />{inCart ? `In cart (${inCart}) · add one more` : "Add to cart"}

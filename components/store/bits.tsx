@@ -104,16 +104,15 @@ export function ProductLink({ product, children, className }: { product: Product
   return <Link href={`/store/p/${product.slug}`} className={className}>{children}</Link>;
 }
 
-/** What a shopper is told about stock: nothing when there is plenty - only "Low stock" or "Out of stock" for the chosen branch. */
-export function StockNote({ product, branches, branch }: { product: Product; branches: Branch[]; branch: string | null }) {
+/** What a shopper is told about stock: nothing when there is plenty - only "Low stock" or "Out of stock" (no branch names). */
+export function StockNote({ product, branch }: { product: Product; branch: string | null }) {
   const status = Object.values(product.stock_status);
   let text: string | null = null;
   let kind: "OUT" | "LOW" = "OUT";
   if (branch) {
     const s = product.stock_status[branch];
-    const name = branches.find((b) => b.code === branch)?.name;
-    if (s === "OUT") text = `Out of stock at ${name}`;
-    else if (s === "LOW") { text = `Low stock at ${name}`; kind = "LOW"; }
+    if (s === "OUT") text = "Out of stock";
+    else if (s === "LOW") { text = "Low stock"; kind = "LOW"; }
   } else if (status.length > 0 && status.every((s) => s === "OUT")) text = "Out of stock";
   return <p className="min-h-5 text-xs font-semibold" data-testid="stock-note">{text && <span className={kind === "OUT" ? "text-danger" : "text-warning"}>{text}</span>}</p>;
 }

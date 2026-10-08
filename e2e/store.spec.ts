@@ -51,15 +51,14 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   await expect(mug).toContainText("(₹236.00 incl. GST)");
   // shoppers are never shown stock numbers: only "Out of stock" / "Low stock" for the branch they chose
   await page.getByLabel("Pick-up branch").first().selectOption("HAD");
-  await expect(mug).toContainText("Out of stock at Hadapsar");
+  await expect(mug).toContainText("Out of stock");
+  await expect(mug).not.toContainText("Hadapsar");
   await page.getByLabel("Pick-up branch").first().selectOption("TIL");
   await expect(mug).not.toContainText("stock");
   await expect(mug).not.toContainText("10");
 
   // product page: stock at every branch, add two to the cart
   await mug.getByRole("link").first().click();
-  await expect(page.getByTestId("branch-stock")).toContainText("Hadapsar");
-  await expect(page.getByTestId("branch-stock")).not.toContainText("Tilak");
   await page.getByRole("button", { name: "Increase Quantity" }).click();
   await page.getByRole("button", { name: "Add to cart" }).click();
   await expect(page.getByTestId("cart-count")).toHaveText("2");
