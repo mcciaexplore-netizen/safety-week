@@ -23,6 +23,10 @@ export interface Order {
   items: { name: string; quantity: number; rate: string; amount: string }[];
 }
 
+/* ---------- enquiries: the central admin's number (shown only when an order cannot be fully supplied) ---------- */
+export const ENQUIRY_PHONE = "9822185995";
+export const ENQUIRY_PHONE_SPACED = "98221 85995";
+
 /* ---------- money ---------- */
 export const rupees = (n: number | string) =>
   `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

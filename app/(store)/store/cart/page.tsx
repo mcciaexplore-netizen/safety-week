@@ -62,7 +62,8 @@ export default function CartPage() {
         {needBranch && <ChooseBranchFirst className="mb-3" branches={data.branches} onPick={(c) => { storeActions.setBranch(c); setNeedBranch(false); }} />}
         <ul className="space-y-3" data-testid="cart-lines">
           {lines.map(({ product: p, qty }) => (
-            <li key={p.id} className="glass flex gap-4 rounded-xl p-4" data-testid="cart-line">
+            <li key={p.id} className="glass flex flex-col gap-3 rounded-xl p-4" data-testid="cart-line">
+              <div className="flex gap-4">
               <div className="w-20 shrink-0"><ProductImage product={p} /></div>
               <div className="min-w-0 flex-1">
                 <Link href={`/store/p/${p.slug}`} className="font-heading font-bold hover:text-primary">{p.name}</Link>
@@ -75,9 +76,10 @@ export default function CartPage() {
                 </div>
               </div>
               <p className="shrink-0 text-right font-heading font-bold">{rupees(gstPrice(p) * qty)}</p>
+              </div>
               {notes[p.id] && (
-                <div className="basis-full">
-                  <AvailabilityNotice info={notes[p.id]} branchName={data.branches.find((b) => b.code === branch)?.name ?? ""}
+                <div>
+                  <AvailabilityNotice info={notes[p.id]} adjusted={qty <= notes[p.id].available} branchName={data.branches.find((b) => b.code === branch)?.name ?? ""}
                     onSwitch={(c) => { storeActions.setBranch(c); setNotes({}); }} />
                 </div>
               )}

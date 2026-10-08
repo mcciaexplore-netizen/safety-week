@@ -78,8 +78,10 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   await page.getByLabel("Mobile number").fill("9822001111");
   await page.getByLabel(/^E-mail/).fill(`meera.${Date.now()}@example.com`);
   await page.getByTestId("branch-HAD").click();
+  await expect(page.getByTestId("enquire-now")).toHaveCount(0);                                   // never shown unless something is out of stock
   await page.getByTestId("place-order").click();
-  await expect(page.getByTestId("checkout-error")).toContainText("collect it from Tilak Road");   // only a branch that really has it is suggested
+  await expect(page.getByTestId("checkout-error")).toContainText("collect it from Tilak Road");
+  await expect(page.getByTestId("checkout-error").getByTestId("enquire-now")).toBeVisible();   // only a branch that really has it is suggested
   await expect(page.getByTestId("checkout-error")).not.toContainText("Bhosari");
   await page.getByTestId("branch-TIL").click();
   await expect(page.getByText("Pay at pick-up").first()).toBeVisible();
@@ -151,10 +153,26 @@ test("store: adding more than a branch really has is capped at its live stock, a
   await expect(page.getByTestId("cart-count")).toHaveText("5");
   await expect(notice.getByTestId("switch-BHO")).toContainText("Bhosari · 20 available");
   await expect(notice.getByTestId("switch-SBR")).toContainText("SB Road · 3 available (not enough)");
+  await expect(notice.getByTestId("enquire-now")).toHaveAttribute("href", "tel:+919822185995");
+  await expect(notice.getByTestId("enquire-now")).toContainText("98221 85995");
   await page.screenshot({ path: "test-results/24-availability.png" });
 
   // switching to the branch that has enough puts the wanted quantity in the cart
   await notice.getByTestId("switch-BHO").click();
   await expect(page.getByLabel("Pick-up branch").first()).toHaveValue("BHO");
   await expect(page.getByTestId("cart-count")).toHaveText("9");   // the 9 they wanted in total
+
+  // the cart page re-reads live stock too, and the line stays tidy (details, then the note underneath)
+  const caps = ((await (await request.get(`${API}/api/v1/products`)).json()) as { id: string; name: string }[]).find((x) => x.name === "Caps")!;
+  await page.evaluate(([id]) => window.localStorage.setItem("mccia.store.v1", JSON.stringify({ cart: { [id]: 12 }, branch: "TIL", token: null, customer: null })), [caps.id]);
+  await page.goto("/store/cart");
+  await expect(page.getByTestId("availability-notice")).toContainText("Only 5 available at Tilak Road");
+  await expect(page.getByTestId("enquire-now")).toBeVisible();
+  const line = await page.getByTestId("cart-line").boundingBox();
+  const note = await page.getByTestId("availability-notice").boundingBox();
+  const name = await page.getByRole("link", { name: "Caps", exact: true }).boundingBox();
+  expect(note!.y).toBeGreaterThan(name!.y + name!.height);                                   // the note sits below the product, not beside / over it
+  expect(note!.x + note!.width).toBeLessThanOrEqual(line!.x + line!.width + 1);
+  await page.screenshot({ path: "test-results/25-cart-notice.png", fullPage: true });
 });
+

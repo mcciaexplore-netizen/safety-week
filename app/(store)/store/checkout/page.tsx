@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EnquireButton } from "@/components/store/availability";
 import { cartLines, cartTotals, rupees, storeActions, storeApi, StoreError, useCatalogue, useStore, type Order } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
@@ -127,6 +128,7 @@ export default function CheckoutPage() {
             <div role="alert" data-testid="checkout-error" className="rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm text-danger">
               {problem.short ? "We cannot complete this order yet:" : problem.message}
               {problem.short && <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">{problem.short.map((s) => <li key={s.product_id}>{s.message}</li>)}</ul>}
+              {problem.short && <EnquireButton className="mt-3" />}
             </div>
           )}
           <Button type="submit" size="lg" className="w-full" disabled={busy || !data.open || !branch} data-testid="place-order">
