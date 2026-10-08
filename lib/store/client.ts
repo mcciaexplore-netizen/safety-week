@@ -70,6 +70,27 @@ export async function downloadOrderInvoice(number: string, auth: { token?: strin
   URL.revokeObjectURL(url);
 }
 
+/* ---------- live availability: asked of the database every time a shopper adds or changes a quantity ---------- */
+export interface Availability {
+  product_id: string; name: string; wanted: number; available: number;
+  options: { code: string; name: string; available: number; enough: boolean }[];
+}
+export function checkAvailability(branch: string, items: { product_id: string; quantity: number }[]) {
+  return storeApi<Availability[]>("/availability", { method: "POST", body: JSON.stringify({ branch_code: branch, items }) });
+}
+
+/**
+ * Put `wanted` of a product in the cart for `branch`, but only as many as the branch REALLY has right now.
+ * Returns what happened so the screen can tell the shopper (and offer other branches).
+ */
+export async function setQtyChecked(productId: string, wanted: number, branch: string): Promise<{ qty: number; info: Availability | null }> {
+  if (wanted <= 0) { storeActions.setQty(productId, 0); return { qty: 0, info: null }; }
+  const [info] = await checkAvailability(branch, [{ product_id: productId, quantity: wanted }]);
+  const qty = Math.min(wanted, info.available);
+  storeActions.setQty(productId, qty);
+  return { qty, info: info.available >= wanted ? null : info };
+}
+
 /* ---------- catalogue (fetched once, shared by every page) ---------- */
 let cached: { at: number; data: Promise<Catalogue> } | null = null;
 export function loadCatalogue(force = false): Promise<Catalogue> {
@@ -126,7 +147,7 @@ function subscribe(cb: () => void) {
 export const storeActions = {
   setQty(id: string, qty: number) {
     const cart = { ...state.cart };
-    if (qty <= 0) delete cart[id]; else cart[id] = Math.floor(qty); // no limit: stock is checked at checkout
+    if (qty <= 0) delete cart[id]; else cart[id] = Math.floor(qty); // callers use setQtyChecked: the branch's live stock is the limit
     set({ cart });
   },
   add(id: string, qty = 1) { storeActions.setQty(id, (state.cart[id] ?? 0) + qty); },

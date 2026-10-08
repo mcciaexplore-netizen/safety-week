@@ -7,7 +7,8 @@ import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, ProductLink, StockNote } from "@/components/store/bits";
-import { storeActions, useCatalogue, useStore, type Product } from "@/lib/store/client";
+import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
+import { setQtyChecked, storeActions, useCatalogue, useStore, type Availability, type Branch, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 
@@ -80,7 +81,7 @@ function Shop() {
           <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">Nothing matches. Try another category or search.</p>
         ) : (
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4" data-testid="product-grid">
-            {products.map((p) => <ProductCard key={p.id} p={p} branch={branch} inCart={cart[p.id] ?? 0} />)}
+            {products.map((p) => <ProductCard key={p.id} p={p} branches={data.branches} branch={branch} inCart={cart[p.id] ?? 0} />)}
           </ul>
         )}
       </section>
@@ -88,7 +89,21 @@ function Shop() {
   );
 }
 
-function ProductCard({ p, branch, inCart }: { p: Product; branch: string | null; inCart: number }) {
+function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Branch[]; branch: string | null; inCart: number }) {
+  const [info, setInfo] = useState<Availability | null>(null);
+  const [needBranch, setNeedBranch] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const branchName = branches.find((b) => b.code === branch)?.name ?? "";
+
+  /** Reads the branch's live stock from the database, then adds as many as it really has. */
+  async function add(code: string | null, extra = 1, base = inCart) {
+    if (!code) { setNeedBranch(true); return; }
+    setNeedBranch(false);
+    setBusy(true);
+    try { setInfo((await setQtyChecked(p.id, base + extra, code)).info); }
+    catch { setInfo(null); }
+    finally { setBusy(false); }
+  }
   return (
     <li className="card-lift glass flex flex-col rounded-xl p-4" data-testid="product-card">
       <ProductLink product={p} className="block">
@@ -101,8 +116,10 @@ function ProductCard({ p, branch, inCart }: { p: Product; branch: string | null;
       </ProductLink>
       <PriceBlock product={p} className="mt-2" />
       <StockNote product={p} branch={branch} />
+      {needBranch && <ChooseBranchFirst className="mt-3" branches={branches} onPick={(c) => { storeActions.setBranch(c); void add(c); }} />}
+      {info && <AvailabilityNotice className="mt-3" info={info} branchName={branchName} onSwitch={(c) => { storeActions.setBranch(c); setInfo(null); void add(c, info.wanted - inCart); }} />}
       <div className="mt-auto pt-4">
-        <Button className="w-full" variant={inCart ? "outline" : "default"} onClick={() => storeActions.add(p.id)} aria-label={`Add ${p.name} to cart`}>
+        <Button className="w-full" variant={inCart ? "outline" : "default"} onClick={() => void add(branch)} disabled={busy} aria-label={`Add ${p.name} to cart`}>
           <ShoppingCart data-icon="inline-start" />{inCart ? `In cart (${inCart}) · add one more` : "Add to cart"}
         </Button>
       </div>

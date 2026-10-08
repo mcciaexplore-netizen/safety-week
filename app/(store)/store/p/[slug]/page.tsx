@@ -7,7 +7,8 @@ import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockNote } from "@/components/store/bits";
-import { storeActions, useCatalogue, useStore } from "@/lib/store/client";
+import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
+import { setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -15,7 +16,23 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   const { branch, cart } = useStore();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [info, setInfo] = useState<Availability | null>(null);
+  const [needBranch, setNeedBranch] = useState(false);
+  const [busy, setBusy] = useState(false);
   const p = data?.products.find((x) => x.slug === slug);
+
+  /** Live stock for the chosen branch decides how many can be added. */
+  async function addToCart(code: string | null, quantity: number) {
+    if (!p) return;
+    if (!code) { setNeedBranch(true); return; }
+    setNeedBranch(false);
+    setBusy(true);
+    try {
+      const r = await setQtyChecked(p.id, (cart[p.id] ?? 0) + quantity, code);
+      setInfo(r.info);
+      if (r.qty > 0) { setAdded(true); setTimeout(() => setAdded(false), 2000); }
+    } catch { setInfo(null); } finally { setBusy(false); }
+  }
 
   if (error) return <div className="mx-auto max-w-3xl px-4 py-16"><ErrorState message={error} onRetry={reload} /></div>;
   if (!data) return <div className="mx-auto max-w-5xl px-4 py-12"><Skeleton className="h-96" /></div>;
@@ -42,9 +59,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
               <BranchSelect branches={data.branches} value={branch} onChange={storeActions.setBranch} />
             </label>
             <StockNote product={p} branch={branch} />
+            {needBranch && <ChooseBranchFirst branches={data.branches} onPick={(c) => { storeActions.setBranch(c); void addToCart(c, qty); }} />}
+            {info && <AvailabilityNotice info={info} branchName={data.branches.find((b) => b.code === branch)?.name ?? ""} onSwitch={(c) => { storeActions.setBranch(c); setInfo(null); void addToCart(c, Math.max(1, info.wanted - (cart[p.id] ?? 0))); }} />}
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <QtyStepper value={qty} onChange={(n) => setQty(Math.max(1, n))} label="Quantity" />
-              <Button size="lg" onClick={() => { storeActions.add(p.id, qty); setAdded(true); setTimeout(() => setAdded(false), 2000); }}>
+              <Button size="lg" disabled={busy} onClick={() => void addToCart(branch, qty)}>
                 {added ? <Check data-icon="inline-start" /> : <ShoppingCart data-icon="inline-start" />}{added ? "Added" : "Add to cart"}
               </Button>
               {(cart[p.id] ?? 0) > 0 && <Link href="/store/cart" className="text-sm font-semibold text-primary">View cart ({cart[p.id]})</Link>}

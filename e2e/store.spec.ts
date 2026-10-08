@@ -22,13 +22,18 @@ async function openStoreWithStock(request: APIRequestContext) {
     const r = await request.put(`${API}/api/v1/admin/events/${ev.id}`, { headers: h, data: { name: ev.name, year: ev.year, invoice_prefix: ev.invoice_prefix, start_date: "2027-03-04", end_date: "2027-03-10", status: "OPEN", notes: ev.notes } });
     expect(r.ok()).toBeTruthy();
   }
+  await setStock(request, h, "Coffee Mugs", [["TIL", 10], ["HAD", 0]]);
+}
+
+/** Gives each listed branch exactly `left` units of a material still to sell. */
+async function setStock(request: APIRequestContext, h: Record<string, string>, name: string, levels: (readonly [string, number])[]) {
   const products = (await (await request.get(`${API}/api/v1/products`)).json()) as { id: string; name: string }[];
-  const mug = products.find((p) => p.name === "Coffee Mugs")!;
-  for (const [branch, left] of [["TIL", 10], ["HAD", 0]] as const) {
+  const prod = products.find((p) => p.name === name)!;
+  for (const [branch, left] of levels) {
     const st = (await (await request.get(`${API}/api/v1/stock?branch=${branch}`, { headers: h })).json()) as { items: { name: string; sold: number; transferred_in: number; transferred_out: number }[] };
-    const it = st.items.find((i) => i.name === "Coffee Mugs")!;
+    const it = st.items.find((i) => i.name === name)!;
     const opening = Math.max(0, left + it.sold + it.transferred_out - it.transferred_in);
-    await request.put(`${API}/api/v1/stock?branch=${branch}`, { headers: h, data: { items: [{ product_id: mug.id, opening_qty: opening, low_threshold: 2 }] } });
+    await request.put(`${API}/api/v1/stock?branch=${branch}`, { headers: h, data: { items: [{ product_id: prod.id, opening_qty: opening, low_threshold: 2 }] } });
   }
 }
 
@@ -124,4 +129,32 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   await admin.screenshot({ path: "test-results/21-online-analytics.png", fullPage: true });
 
   expect(errors).toEqual([]);
+});
+
+test("store: adding more than a branch really has is capped at its live stock, and other branches are offered with their live counts", async ({ page, request }) => {
+  await openStoreWithStock(request);
+  const h = await devToken(request, "admin@example.invalid");
+  await setStock(request, h, "Caps", [["TIL", 5], ["BHO", 20], ["SBR", 3]]);
+
+  await page.goto("/store/p/caps");
+  // a branch must be chosen first (we need it to read the right stock)
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  await expect(page.getByTestId("choose-branch")).toBeVisible();
+  await page.getByTestId("choose-branch").getByLabel("Pick-up branch").selectOption("TIL");
+  await expect(page.getByTestId("cart-count")).toHaveText("1");
+
+  // asking for 8 when Tilak Road really has 5: capped at 5, the live number shown, other branches offered with theirs
+  for (let i = 0; i < 7; i++) await page.getByRole("button", { name: "Increase Quantity" }).click();
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  const notice = page.getByTestId("availability-notice");
+  await expect(notice).toContainText("Only 5 available at Tilak Road");
+  await expect(page.getByTestId("cart-count")).toHaveText("5");
+  await expect(notice.getByTestId("switch-BHO")).toContainText("Bhosari · 20 available");
+  await expect(notice.getByTestId("switch-SBR")).toContainText("SB Road · 3 available (not enough)");
+  await page.screenshot({ path: "test-results/24-availability.png" });
+
+  // switching to the branch that has enough puts the wanted quantity in the cart
+  await notice.getByTestId("switch-BHO").click();
+  await expect(page.getByLabel("Pick-up branch").first()).toHaveValue("BHO");
+  await expect(page.getByTestId("cart-count")).toHaveText("9");   // the 9 they wanted in total
 });

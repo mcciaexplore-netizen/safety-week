@@ -276,6 +276,44 @@ def _notify_placed(s: Session, o: Order, p: Principal) -> None:
         attachments=attachments))
 
 
+class AvailLine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    product_id: uuid.UUID
+    quantity: int = Field(ge=0, le=MAX_QTY)
+
+
+class AvailIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    branch_code: str = Field(min_length=3, max_length=3)
+    items: list[AvailLine] = Field(min_length=1, max_length=60)
+
+
+@router.post("/availability")
+def availability(body: AvailIn, s: Sess):
+    """LIVE stock, read from the database at this very moment, for the branch the shopper chose: how many it really has
+    (that number is the most they can put in the cart for that branch) and what the other branches have right now.
+    Called when a shopper adds to the cart or changes a quantity."""
+    e = repo.current_event(s)
+    if e is None:
+        raise HTTPException(409, "The store is closed at the moment")
+    branch = _branch(s, body.branch_code.upper())
+    products = repo.products_by_ids(s, e.id, [l.product_id for l in body.items])
+    here = {i.product_id: i.remaining for i in levels(s, branch, e)}
+    others = [(b, {i.product_id: i.remaining for i in levels(s, b, e)})
+              for b in s.scalars(select(Branch).where(Branch.active, Branch.id != branch.id).order_by(Branch.name))]
+    out = []
+    for l in body.items:
+        pr = products.get(l.product_id)
+        if pr is None or not pr.active or not pr.online_enabled:
+            raise HTTPException(422, "One of the products is no longer available")
+        opts = [{"code": b.code, "name": b.name, "available": max(0, st.get(l.product_id) or 0), "enough": (st.get(l.product_id) or 0) >= l.quantity}
+                for b, st in others if (st.get(l.product_id) or 0) > 0]
+        opts.sort(key=lambda o: (not o["enough"], -o["available"]))
+        out.append({"product_id": str(l.product_id), "name": _clean(pr.name), "wanted": l.quantity,
+                    "available": max(0, here.get(l.product_id) or 0), "options": opts})
+    return out
+
+
 @router.post("/orders", status_code=201)
 def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Header()] = None):
     if body.payment_method == "ONLINE" and not ONLINE_PAYMENTS:

@@ -243,3 +243,25 @@ def test_store_is_closed_until_the_event_is_open(client, people, prods):
     finally:
         with engine.begin() as c:
             c.execute(text("update events set status = 'OPEN' where invoice_prefix = 'NSW27'"))
+
+
+def test_live_availability_caps_the_branch_and_offers_other_branches(client, people, prods):
+    stock_for(client, people, prods, "TIL", "Water Bottle", 3)
+    stock_for(client, people, prods, "HAD", "Water Bottle", 10)
+    stock_for(client, people, prods, "SBR", "Water Bottle", 1)
+    ask = lambda branch, qty: client.post(f"{S}/availability", json={"branch_code": branch, "items": [{"product_id": prods["Water Bottle"], "quantity": qty}]})
+    r = ask("TIL", 5)
+    assert r.status_code == 200
+    line = r.json()[0]
+    assert (line["available"], line["wanted"]) == (3, 5)                                                # the live number is the limit for that branch
+    opts = {o["name"]: o for o in line["options"]}
+    assert opts["Hadapsar"] == {"code": "HAD", "name": "Hadapsar", "available": 10, "enough": True}      # another branch that can fill it
+    assert opts["SB Road"]["available"] == 1 and opts["SB Road"]["enough"] is False                      # shown, but flagged as not enough
+    assert "Bhosari" not in opts and "Tilak Road" not in opts                                            # no stock / the same branch: not offered
+    assert line["options"][0]["name"] == "Hadapsar"                                                       # branches that can fill it come first
+    assert ask("TIL", 2).json()[0]["available"] == 3
+    # it follows the database live: sell one and the answer changes at once
+    client.post(f"{S}/orders", json=order_body(prods, lines=(("Water Bottle", 1),), email="live@example.com"))
+    assert ask("TIL", 5).json()[0]["available"] == 2
+    assert ask("TIL", 100000).status_code == 200 and ask("XXX", 1).status_code == 422
+    assert client.post(f"{S}/availability", json={"branch_code": "TIL", "items": [{"product_id": "00000000-0000-0000-0000-000000000000", "quantity": 1}]}).status_code == 422
