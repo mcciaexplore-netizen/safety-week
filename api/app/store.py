@@ -136,7 +136,7 @@ def catalogue(s: Sess):
     for p in prods:
         out.append({
             "id": str(p.id), "slug": p.slug or str(p.id), "name": _clean(p.name), "category": p.category or "Safety Materials",
-            "image_url": p.image_url, "unit": p.unit, "hsn_code": p.hsn_code,
+            "image_url": p.image_url, "best_seller": p.best_seller, "unit": p.unit, "hsn_code": p.hsn_code,
             "rate": str(p.current_rate), "gst_percent": str(p.cgst_rate + p.sgst_rate), "price_incl_gst": str(_price_incl_gst(p)),
             # None (stock not set up) counts as 0 for shoppers
             "stock": {code: max(0, min(999, st.get(p.id) or 0)) for code, st in stock.items()},

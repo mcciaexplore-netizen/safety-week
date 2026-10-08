@@ -149,6 +149,7 @@ class Product(Base):
     category: Mapped[str] = mapped_column(String(60), server_default="")
     image_url: Mapped[str] = mapped_column(String(500), server_default="")
     online_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    best_seller: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
 
 
 class DiscountRule(Base):

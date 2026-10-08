@@ -6,7 +6,7 @@ import { ArrowLeft, Check, ShoppingCart } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BranchSelect, PriceBlock, ProductImage, QtyStepper, StockLine } from "@/components/store/bits";
+import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockLine } from "@/components/store/bits";
 import { storeActions, useCatalogue, useStore } from "@/lib/store/client";
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -32,7 +32,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <Link href="/store" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="size-4" />All products</Link>
       <div className="grid gap-10 md:grid-cols-2">
-        <div className="glass rounded-xl p-4"><ProductImage product={p} /></div>
+        <div className="glass relative rounded-xl p-4"><ProductImage product={p} />{p.best_seller && <BestSellerTag className="absolute top-7 left-7" />}</div>
         <div>
           <p className="label-xs">{p.category}</p>
           <h1 className="mt-2 text-[clamp(1.8rem,3.5vw,2.5rem)] font-extrabold">{p.name}</h1>

@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/format";
 import { ProductStockFlag, useStockAlerts } from "@/components/app/low-stock-alert";
 import { api } from "@/lib/services/api";
 
-interface Product { id: string; sku: string; name: string; description: string; hsn_code: string; unit: string; current_rate: string; cgst_rate: string; sgst_rate: string; sr_no: number | null; line_order: number; active: boolean; rate_confirmed: boolean; category: string; image_url: string; online_enabled: boolean }
+interface Product { best_seller: boolean; id: string; sku: string; name: string; description: string; hsn_code: string; unit: string; current_rate: string; cgst_rate: string; sgst_rate: string; sr_no: number | null; line_order: number; active: boolean; rate_confirmed: boolean; category: string; image_url: string; online_enabled: boolean }
 
 const FIELDS: FieldSpec[] = [
   { key: "name", label: "Particulars (name on the invoice)", wide: true },
@@ -29,6 +29,7 @@ const FIELDS: FieldSpec[] = [
   { key: "category", label: "Online store category", hint: "Groups the product in the store, e.g. T-Shirts." },
   { key: "image_url", label: "Photo web address (https://…)", hint: "Shown in the online store. Leave blank for a placeholder.", wide: true },
   { key: "online_enabled", label: "Show in the online store", type: "checkbox" },
+  { key: "best_seller", label: "Tag as a best seller in the store", type: "checkbox" },
   { key: "active", label: "Available on new invoices", type: "checkbox" },
   { key: "confirm_rate", label: "I have checked this rate for the current event", type: "checkbox" },
 ];
@@ -83,12 +84,12 @@ export default function ProductsPage() {
           key={p?.id ?? "new"}
           title={isNew ? "Add product" : "Edit product"}
           fields={isNew ? FIELDS.filter((f) => f.key !== "confirm_rate") : FIELDS}
-          initial={isNew ? { name: "", hsn_code: "", unit: "Nos.", current_rate: "", cgst_rate: "9", sgst_rate: "9", line_order: String((list.data?.length ?? 0) + 1), sr_no: "", description: "", category: "", image_url: "", online_enabled: true, active: true }
-            : { name: p!.name, hsn_code: p!.hsn_code, unit: p!.unit, current_rate: p!.current_rate, cgst_rate: p!.cgst_rate, sgst_rate: p!.sgst_rate, line_order: String(p!.line_order), sr_no: p!.sr_no ? String(p!.sr_no) : "", description: p!.description, category: p!.category, image_url: p!.image_url, online_enabled: p!.online_enabled, active: p!.active, confirm_rate: false }}
+          initial={isNew ? { name: "", hsn_code: "", unit: "Nos.", current_rate: "", cgst_rate: "9", sgst_rate: "9", line_order: String((list.data?.length ?? 0) + 1), sr_no: "", description: "", category: "", image_url: "", online_enabled: true, best_seller: false, active: true }
+            : { name: p!.name, hsn_code: p!.hsn_code, unit: p!.unit, current_rate: p!.current_rate, cgst_rate: p!.cgst_rate, sgst_rate: p!.sgst_rate, line_order: String(p!.line_order), sr_no: p!.sr_no ? String(p!.sr_no) : "", description: p!.description, category: p!.category, image_url: p!.image_url, online_enabled: p!.online_enabled, best_seller: p!.best_seller, active: p!.active, confirm_rate: false }}
           onSave={async (v) => {
             const body = { name: str(v.name), description: str(v.description), hsn_code: str(v.hsn_code), unit: str(v.unit) || "Nos.", current_rate: str(v.current_rate),
               cgst_rate: str(v.cgst_rate), sgst_rate: str(v.sgst_rate), line_order: Number(v.line_order), sr_no: orNull(v.sr_no) ? Number(v.sr_no) : null, active: !!v.active, confirm_rate: !!v.confirm_rate,
-              category: str(v.category), image_url: str(v.image_url), online_enabled: !!v.online_enabled };
+              category: str(v.category), image_url: str(v.image_url), online_enabled: !!v.online_enabled, best_seller: !!v.best_seller };
             await api(isNew ? "/admin/products" : `/admin/products/${p!.id}`, { method: isNew ? "POST" : "PUT", body: JSON.stringify(body) });
             list.reload();
           }}

@@ -24,3 +24,9 @@ def category_of(name: str) -> str:
         if re.search(pattern, n):
             return cat
     return "Safety Materials"
+
+
+def is_best_seller(name: str) -> bool:
+    """MCCIA's best sellers: Badges, Flags (normal and handy), Oath flex, Posters, Slogans (mirrored in migration 0013)."""
+    n = " ".join(name.split()).lower()
+    return n in ("badges", "flags - normal", "flags - handy") or n.startswith(("oath", "poster", "slogan"))

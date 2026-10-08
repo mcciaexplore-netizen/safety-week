@@ -40,6 +40,12 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   // browse: price shows the shelf price with the GST-inclusive price in brackets underneath
   await page.goto("/store");
   await expect(page.getByTestId("product-card").first()).toBeVisible();
+  // best sellers carry a tag and have their own filter button
+  await page.getByRole("button", { name: "Best sellers" }).click();
+  await expect(page.getByTestId("best-seller-tag").first()).toBeVisible();
+  await expect(page.getByTestId("product-card").filter({ hasText: "Badges" })).toBeVisible();
+  await expect(page.getByTestId("product-card").filter({ hasText: "Coffee Mugs" })).toHaveCount(0);
+  await page.getByRole("button", { name: "All", exact: true }).click();
   const mug = page.getByTestId("product-card").filter({ hasText: "Coffee Mugs" });
   await expect(mug).toContainText("₹200.00");
   await expect(mug).toContainText("(₹236.00 incl. GST)");

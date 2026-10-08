@@ -284,6 +284,7 @@ class ProductAdminOut(Strict):
     category: str = ""
     image_url: str = ""
     online_enabled: bool = True
+    best_seller: bool = False
 
 
 class ProductIn(Strict):
@@ -300,7 +301,8 @@ class ProductIn(Strict):
     confirm_rate: bool = False  # "I have checked this rate for the current event"
     category: str = Field(default="", max_length=60)
     image_url: str = Field(default="", max_length=500, pattern=r"^$|^https://\S+$")
-    online_enabled: bool = True  # shown in the online store
+    online_enabled: bool | None = None  # shown in the online store (left as it is when not sent)
+    best_seller: bool | None = None  # tagged "Best seller" in the online store (left as it is when not sent)
 
 
 class ConfirmIn(Strict):
@@ -323,6 +325,8 @@ def create_product(data: ProductIn, s: Sess, event_id: uuid.UUID | None = None):
     e = _event_for(s, event_id)
     fields = data.model_dump(exclude={"confirm_rate"})
     fields["category"] = fields["category"] or category_of(data.name)
+    fields["online_enabled"] = True if fields["online_enabled"] is None else fields["online_enabled"]
+    fields["best_seller"] = bool(fields["best_seller"])
     p = Product(id=uuid.uuid4(), event_id=e.id, sku=f"{e.invoice_prefix}-{uuid.uuid4().hex[:6].upper()}",
                 slug=f"{slugify(data.name)}-{uuid.uuid4().hex[:4]}", rate_confirmed=True, **fields)  # a product an admin just typed in is deliberate
     s.add(p)
@@ -335,6 +339,8 @@ def edit_product(product_id: uuid.UUID, data: ProductIn, s: Sess):
     p = s.get(Product, product_id) or _404("product")
     rate_changed = data.current_rate != p.current_rate
     for k, v in data.model_dump(exclude={"confirm_rate"}).items():
+        if k in ("online_enabled", "best_seller") and v is None:
+            continue  # not sent: keep what is there
         setattr(p, k, v)
     if rate_changed or data.confirm_rate:
         p.rate_confirmed = True

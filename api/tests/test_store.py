@@ -63,6 +63,9 @@ def test_catalogue_shows_stock_per_branch(client, people, prods):
     assert badges["rate"] == "200.00" and badges["price_incl_gst"] == "236.00" and badges["gst_percent"] == "18.00"   # 200 x 1.18
     assert badges["category"] == "Gifts & Accessories" and badges["slug"] == "coffee-mugs"
     assert len(cat["products"]) == 39 and "T-Shirts" in cat["categories"]
+    best = {p["name"] for p in cat["products"] if p["best_seller"]}
+    assert {"Badges", "Flags - Normal", "Flags - Handy"} <= best and not (best & {"Caps", "Coffee Mugs", "Water Bottle"})
+    assert any(n.startswith(("Oath", "Posters", "Slogans")) for n in best)
     assert not any("password" in str(p).lower() for p in cat["products"])
 
 

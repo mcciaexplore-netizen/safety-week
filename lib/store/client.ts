@@ -6,7 +6,7 @@ import { API_URL } from "@/lib/services/api";
 /* ---------- types (what the store API returns) ---------- */
 export interface Branch { code: string; name: string; address: string; phone: string }
 export interface Product {
-  id: string; slug: string; name: string; category: string; image_url: string; unit: string; hsn_code: string;
+  id: string; slug: string; name: string; category: string; image_url: string; best_seller: boolean; unit: string; hsn_code: string;
   rate: string; gst_percent: string; price_incl_gst: string; stock: Record<string, number>;
 }
 export interface Catalogue {

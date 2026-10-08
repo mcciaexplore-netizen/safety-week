@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Flag, Gift, Image as ImageIcon, Minus, Plus, ScrollText, Shield, Shirt } from "lucide-react";
+import { BookOpen, Flag, Gift, Image as ImageIcon, Minus, Plus, ScrollText, Shield, Shirt, Star } from "lucide-react";
 import { gstPrice, rupees, type Branch, type OrderStatus, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,15 @@ export function ProductImage({ product, className }: { product: Pick<Product, "n
     >
       <Icon className="size-1/4 text-primary/60" strokeWidth={1.5} />
     </div>
+  );
+}
+
+/** "Best seller" tag shown on a product's picture. */
+export function BestSellerTag({ className }: { className?: string }) {
+  return (
+    <span data-testid="best-seller-tag" className={cn("inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2.5 py-1 text-[0.65rem] font-bold tracking-[0.06em] text-white uppercase shadow-btn", className)}>
+      <Star className="size-3 fill-current" />Best seller
+    </span>
   );
 }
 

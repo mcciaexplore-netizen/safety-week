@@ -2,14 +2,16 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Star } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BranchSelect, BranchStockChips, PriceBlock, ProductImage, ProductLink } from "@/components/store/bits";
+import { BestSellerTag, BranchSelect, BranchStockChips, PriceBlock, ProductImage, ProductLink } from "@/components/store/bits";
 import { storeActions, useCatalogue, useStore, type Branch, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
+
+const BEST = "Best sellers";
 
 function Shop() {
   const params = useSearchParams();
@@ -23,7 +25,7 @@ function Shop() {
 
   const products = useMemo(() => {
     if (!data) return [];
-    let list = data.products.filter((p) => (category === "All" || p.category === category) && (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
+    let list = data.products.filter((p) => (category === "All" || (category === BEST ? p.best_seller : p.category === category)) && (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
     if (inStockOnly && branch) list = list.filter((p) => (p.stock[branch] ?? 0) > 0);
     if (sort === "low") list = [...list].sort((a, b) => Number(a.price_incl_gst) - Number(b.price_incl_gst));
     if (sort === "high") list = [...list].sort((a, b) => Number(b.price_incl_gst) - Number(a.price_incl_gst));
@@ -62,11 +64,11 @@ function Shop() {
 
         {data && (
           <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Categories">
-            {["All", ...data.categories].map((c) => (
+            {["All", BEST, ...data.categories].map((c) => (
               <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={category === c}
                 className={cn("rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200",
                   category === c ? "border-primary bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:border-primary/40 hover:text-primary")}>
-                {c}
+                {c === BEST && <Star className="mr-1 inline size-3.5 fill-current" />}{c}
               </button>
             ))}
           </div>
@@ -91,7 +93,10 @@ function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Br
   return (
     <li className="card-lift glass flex flex-col rounded-xl p-4" data-testid="product-card">
       <ProductLink product={p} className="block">
-        <ProductImage product={p} />
+        <div className="relative">
+          <ProductImage product={p} />
+          {p.best_seller && <BestSellerTag className="absolute top-2 left-2" />}
+        </div>
         <p className="label-xs mt-4">{p.category}</p>
         <h3 className="mt-1 line-clamp-2 min-h-[2.5rem] font-heading text-base leading-snug font-bold">{p.name}</h3>
       </ProductLink>
