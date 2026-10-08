@@ -41,7 +41,7 @@ router = APIRouter(prefix="/api/v1/store")
 Sess = Annotated[Session, Depends(get_session)]
 
 MAX_OPEN_ORDERS = 5  # per e-mail address, uncollected
-MAX_QTY = 500
+MAX_QTY = 1_000_000  # no practical limit on how much can go in a cart: the branch's stock is the only limit
 CODE_TTL_MIN = 10
 CODE_TRIES = 5
 CODES_PER_HOUR = 5
@@ -140,7 +140,6 @@ def catalogue(s: Sess):
             "image_url": p.image_url, "best_seller": p.best_seller, "unit": p.unit, "hsn_code": p.hsn_code,
             "rate": str(p.current_rate), "gst_percent": str(p.cgst_rate + p.sgst_rate), "price_incl_gst": str(_price_incl_gst(p)),
             # None (stock not set up) counts as 0 for shoppers
-            "stock": {code: max(0, min(999, st.get(p.id) or 0)) for code, st in stock.items()},
             # what the shop shows: nothing when there is plenty, "Low stock" or "Out of stock" otherwise
             "stock_status": {code: ("OUT" if (st.get(p.id) or 0) <= 0 else lv[code][p.id].status) for code, st in stock.items()},
         })
@@ -301,10 +300,24 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
     # one buyer at a time per branch, so the last unit cannot be sold twice
     s.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"store:{branch.id}"))))
     have = {i.product_id: i.remaining for i in levels(s, branch, e)}
-    short = [{"product_id": str(l.product_id), "name": _clean(products[l.product_id].name), "available": max(0, have.get(l.product_id) or 0)}
-             for l in body.items if (have.get(l.product_id) or 0) < l.quantity]
-    if short:
-        raise HTTPException(409, {"message": f"Not enough stock at {branch.name}", "short": short})
+    short_lines = [l for l in body.items if (have.get(l.product_id) or 0) < l.quantity]
+    if short_lines:
+        # only now (never earlier) is the shopper told anything about stock; another branch is suggested only if it truly has that quantity
+        others = [(b, {i.product_id: i.remaining for i in levels(s, b, e)})
+                  for b in s.scalars(select(Branch).where(Branch.active, Branch.id != branch.id).order_by(Branch.name))]
+        problems = []
+        for l in short_lines:
+            name = _clean(products[l.product_id].name)
+            alts = [b.name for b, st in others if (st.get(l.product_id) or 0) >= l.quantity]
+            anywhere = (have.get(l.product_id) or 0) > 0 or any((st.get(l.product_id) or 0) > 0 for _, st in others)
+            if alts:
+                msg = f"{name}: this quantity is not available at {branch.name}. You can collect it from {' or '.join(alts)}, or reduce the quantity."
+            elif anywhere:
+                msg = f"{name}: this quantity is not available at any branch right now. Please reduce the quantity."
+            else:
+                msg = f"{name}: no stock available at any branch."
+            problems.append({"product_id": str(l.product_id), "name": name, "message": msg, "alternatives": alts})
+        raise HTTPException(409, {"message": " ".join(x["message"] for x in problems), "short": problems})
 
     p = _system_principal(branch.id)
     data = InvoiceCreate(

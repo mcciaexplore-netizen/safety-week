@@ -59,7 +59,7 @@ def test_catalogue_shows_stock_per_branch(client, people, prods):
     cat = client.get(f"{S}/catalogue").json()
     assert cat["open"] and {b["code"] for b in cat["branches"]} == {"SBR", "TIL", "BHO", "HAD", "AHL"}
     badges = next(p for p in cat["products"] if p["name"] == "Coffee Mugs")
-    assert badges["stock"]["TIL"] == 10 and badges["stock"]["HAD"] == 0
+    assert "stock" not in badges and not any(isinstance(v, int) for v in badges["stock_status"].values())   # shoppers never get numbers
     assert badges["stock_status"]["TIL"] == "OK" and badges["stock_status"]["HAD"] == "OUT" and badges["stock_status"]["SBR"] == "OUT"
     assert badges["rate"] == "200.00" and badges["price_incl_gst"] == "236.00" and badges["gst_percent"] == "18.00"   # 200 x 1.18
     assert badges["category"] == "Gifts & Accessories" and badges["slug"] == "coffee-mugs"
@@ -125,7 +125,17 @@ def test_place_order_reserves_stock_emails_invoice_and_tracks(client, people, pr
 def test_stock_is_checked_per_branch_and_cannot_be_oversold(client, people, prods):
     stock_for(client, people, prods, "TIL", "Coffee Mugs", 3)
     r = client.post(f"{S}/orders", json=order_body(prods, lines=(("Coffee Mugs", 4),)))
-    assert r.status_code == 409 and r.json()["detail"]["short"] == [{"product_id": prods["Coffee Mugs"], "name": "Coffee Mugs", "available": 3}]
+    assert r.status_code == 409
+    short = r.json()["detail"]["short"]
+    assert [(x["name"], x["alternatives"]) for x in short] == [("Coffee Mugs", [])] and "no stock available at any branch" not in short[0]["message"]
+    assert "reduce the quantity" in short[0]["message"] and "3" not in short[0]["message"]                  # no numbers, no other branch suggested
+    # another branch that truly has enough is suggested by name
+    stock_for(client, people, prods, "HAD", "Coffee Mugs", 10)
+    r = client.post(f"{S}/orders", json=order_body(prods, lines=(("Coffee Mugs", 4),)))
+    assert r.status_code == 409 and r.json()["detail"]["short"][0]["alternatives"] == ["Hadapsar"] and "Hadapsar" in r.json()["detail"]["message"]
+    stock_for(client, people, prods, "HAD", "Coffee Mugs", 0)
+    r = client.post(f"{S}/orders", json=order_body(prods, branch="HAD", lines=(("Coffee Mugs", 1),)))
+    assert r.status_code == 409 and r.json()["detail"]["short"][0]["alternatives"] == ["Tilak Road"] or "no stock available" in r.json()["detail"]["message"]
     assert client.post(f"{S}/orders", json=order_body(prods, branch="HAD")).status_code == 409           # that branch has none
     assert client.post(f"{S}/orders", json=order_body(prods, lines=(("Coffee Mugs", 3),), email="a@example.com")).status_code == 201
     assert client.post(f"{S}/orders", json=order_body(prods, lines=(("Coffee Mugs", 1),), email="b@example.com")).status_code == 409  # last unit gone
@@ -134,6 +144,8 @@ def test_stock_is_checked_per_branch_and_cannot_be_oversold(client, people, prod
     assert client.post(f"{S}/orders", json=order_body(prods, branch="XXX")).status_code == 422
     assert client.post(f"{S}/orders", json=order_body(prods, payment_method="ONLINE")).status_code == 409
     assert client.post(f"{S}/orders", json={**order_body(prods), "items": [{"product_id": prods["Coffee Mugs"], "quantity": 0}]}).status_code == 422
+    big = client.post(f"{S}/orders", json={**order_body(prods), "items": [{"product_id": prods["Coffee Mugs"], "quantity": 100000}]})
+    assert big.status_code == 409                                                                         # not a 422 "too many": only stock limits it
     assert client.post(f"{S}/orders", json={**order_body(prods), "items": [{"product_id": prods["Coffee Mugs"], "quantity": 1}] * 2}).status_code == 422
     assert client.post(f"{S}/orders", json={**order_body(prods), "price": "1"}).status_code == 422          # no client-side prices
 

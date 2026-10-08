@@ -6,7 +6,7 @@ import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BranchSelect, ProductImage, QtyStepper } from "@/components/store/bits";
-import { cartLines, cartTotals, gstPrice, rupees, shortages, storeActions, useCatalogue, useStore } from "@/lib/store/client";
+import { cartLines, cartTotals, gstPrice, rupees, storeActions, useCatalogue, useStore } from "@/lib/store/client";
 
 export default function CartPage() {
   const { data, error, reload } = useCatalogue();
@@ -15,7 +15,6 @@ export default function CartPage() {
   if (!data || !ready) return <div className="mx-auto max-w-5xl px-4 py-12"><Skeleton className="h-64" /></div>;
   const lines = cartLines(data, cart);
   const t = cartTotals(lines);
-  const short = branch ? shortages(lines, branch) : [];
 
   if (lines.length === 0)
     return (
@@ -62,11 +61,6 @@ export default function CartPage() {
             <span className="font-medium">Collect from</span>
             <BranchSelect id="cart-branch" branches={data.branches} value={branch} onChange={storeActions.setBranch} className="w-full" />
           </label>
-          {short.length > 0 && (
-            <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
-              This branch cannot supply: {short.map((s) => `${s.name} (wanted ${s.wanted}, has ${s.available})`).join("; ")}. Pick another branch at checkout or reduce the quantity.
-            </div>
-          )}
           <Link href="/store/checkout" className="block"><Button size="lg" className="w-full">Continue to checkout</Button></Link>
           <Link href="/store" className="block text-center text-sm font-semibold text-primary">Keep shopping</Link>
         </aside>

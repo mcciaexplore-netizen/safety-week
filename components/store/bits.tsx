@@ -55,7 +55,7 @@ export function StockLine({ qty, branchName }: { qty: number; branchName?: strin
   return <span className="text-xs font-semibold text-success-fg">In stock{branchName ? ` at ${branchName}` : ""}</span>;
 }
 
-export function QtyStepper({ value, onChange, max = 500, label }: { value: number; onChange: (n: number) => void; max?: number; label: string }) {
+export function QtyStepper({ value, onChange, max, label }: { value: number; onChange: (n: number) => void; max?: number; label: string }) {
   return (
     <div className="inline-flex items-center rounded-lg border bg-white" role="group" aria-label={label}>
       <button type="button" aria-label={`Decrease ${label}`} className="grid size-9 place-items-center text-muted-foreground hover:text-primary disabled:opacity-40"
@@ -65,10 +65,10 @@ export function QtyStepper({ value, onChange, max = 500, label }: { value: numbe
         inputMode="numeric"
         className="h-9 w-12 border-x bg-transparent text-center text-sm font-semibold outline-none"
         value={value}
-        onChange={(e) => onChange(Math.max(0, Math.min(max, Math.floor(Number(e.target.value.replace(/\D/g, "")) || 0))))}
+        onChange={(e) => onChange(Math.max(0, Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.floor(Number(e.target.value.replace(/\D/g, "")) || 0))))}
       />
       <button type="button" aria-label={`Increase ${label}`} className="grid size-9 place-items-center text-muted-foreground hover:text-primary disabled:opacity-40"
-        onClick={() => onChange(value + 1)} disabled={value >= max}><Plus className="size-4" /></button>
+        onClick={() => onChange(value + 1)} disabled={max !== undefined && value >= max}><Plus className="size-4" /></button>
     </div>
   );
 }
@@ -104,15 +104,14 @@ export function ProductLink({ product, children, className }: { product: Product
   return <Link href={`/store/p/${product.slug}`} className={className}>{children}</Link>;
 }
 
-/** What a shopper is told about stock: nothing when there is plenty - only "Low stock" or "Out of stock" (no branch names). */
+/** What a shopper is told about stock: nothing until a branch is chosen, then only "Low stock" / "Out of stock" for THAT branch (never numbers, never all branches together). */
 export function StockNote({ product, branch }: { product: Product; branch: string | null }) {
-  const status = Object.values(product.stock_status);
   let text: string | null = null;
   let kind: "OUT" | "LOW" = "OUT";
   if (branch) {
     const s = product.stock_status[branch];
     if (s === "OUT") text = "Out of stock";
     else if (s === "LOW") { text = "Low stock"; kind = "LOW"; }
-  } else if (status.length > 0 && status.every((s) => s === "OUT")) text = "Out of stock";
+  }
   return <p className="min-h-5 text-xs font-semibold" data-testid="stock-note">{text && <span className={kind === "OUT" ? "text-danger" : "text-warning"}>{text}</span>}</p>;
 }

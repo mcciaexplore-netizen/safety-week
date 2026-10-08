@@ -7,7 +7,7 @@ import { API_URL } from "@/lib/services/api";
 export interface Branch { code: string; name: string; address: string; phone: string }
 export interface Product {
   id: string; slug: string; name: string; category: string; image_url: string; best_seller: boolean; unit: string; hsn_code: string;
-  rate: string; gst_percent: string; price_incl_gst: string; stock: Record<string, number>; stock_status: Record<string, "OK" | "LOW" | "OUT">;
+  rate: string; gst_percent: string; price_incl_gst: string; stock_status: Record<string, "OK" | "LOW" | "OUT">;
 }
 export interface Catalogue {
   open: boolean; event?: string; year?: number; branches: Branch[]; categories: string[]; products: Product[];
@@ -30,7 +30,7 @@ export const gstPrice = (p: Product) => Number(p.price_incl_gst);
 
 /* ---------- API ---------- */
 export class StoreError extends Error {
-  constructor(message: string, public status: number, public short?: { product_id: string; name: string; available: number }[]) {
+  constructor(message: string, public status: number, public short?: { product_id: string; name: string; message: string; alternatives: string[] }[]) {
     super(message);
   }
 }
@@ -126,7 +126,7 @@ function subscribe(cb: () => void) {
 export const storeActions = {
   setQty(id: string, qty: number) {
     const cart = { ...state.cart };
-    if (qty <= 0) delete cart[id]; else cart[id] = Math.min(500, Math.floor(qty));
+    if (qty <= 0) delete cart[id]; else cart[id] = Math.floor(qty); // no limit: stock is checked at checkout
     set({ cart });
   },
   add(id: string, qty = 1) { storeActions.setQty(id, (state.cart[id] ?? 0) + qty); },
@@ -154,8 +154,4 @@ export function cartTotals(lines: { product: Product; qty: number }[]) {
   const basic = lines.reduce((a, l) => a + Number(l.product.rate) * l.qty, 0);
   const gross = lines.reduce((a, l) => a + Number(l.product.rate) * l.qty * (1 + Number(l.product.gst_percent) / 100), 0);
   return { basic, gst: gross - basic, total: Math.round(gross), count: lines.reduce((a, l) => a + l.qty, 0) };
-}
-/** For one branch: which cart lines it cannot supply (and how many it has). */
-export function shortages(lines: { product: Product; qty: number }[], branch: string) {
-  return lines.filter((l) => (l.product.stock[branch] ?? 0) < l.qty).map((l) => ({ name: l.product.name, available: l.product.stock[branch] ?? 0, wanted: l.qty }));
 }

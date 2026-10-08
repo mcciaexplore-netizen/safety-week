@@ -67,12 +67,16 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   await page.goto("/store/cart");
   await expect(page.getByTestId("cart-total")).toHaveText("₹472.00"); // 2 x 236
   await page.getByRole("link", { name: "Continue to checkout" }).click();
-  await expect(page.getByTestId("branch-HAD")).toContainText("short");
-  await expect(page.getByTestId("branch-TIL")).toContainText("in stock");
-  await page.getByTestId("branch-TIL").click();
+  // nothing about stock is shown on the branch cards; the check happens when the shopper tries to place the order
+  await expect(page.getByTestId("branch-HAD")).not.toContainText("stock");
   await page.getByLabel("Full name").fill("Meera Shopper");
   await page.getByLabel("Mobile number").fill("9822001111");
   await page.getByLabel(/^E-mail/).fill(`meera.${Date.now()}@example.com`);
+  await page.getByTestId("branch-HAD").click();
+  await page.getByTestId("place-order").click();
+  await expect(page.getByTestId("checkout-error")).toContainText("collect it from Tilak Road");   // only a branch that really has it is suggested
+  await expect(page.getByTestId("checkout-error")).not.toContainText("Bhosari");
+  await page.getByTestId("branch-TIL").click();
   await expect(page.getByText("Pay at pick-up").first()).toBeVisible();
   await expect(page.getByText("Coming soon")).toBeVisible();
   await page.getByTestId("place-order").click();

@@ -3,13 +3,13 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Banknote, CheckCircle2, CreditCard, Loader2, MapPin } from "lucide-react";
+import { Banknote, CreditCard, Loader2, MapPin } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cartLines, cartTotals, rupees, shortages, storeActions, storeApi, StoreError, useCatalogue, useStore, type Order } from "@/lib/store/client";
+import { cartLines, cartTotals, rupees, storeActions, storeApi, StoreError, useCatalogue, useStore, type Order } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 export default function CheckoutPage() {
@@ -37,7 +37,6 @@ export default function CheckoutPage() {
   const nameV = name ?? customer?.name ?? "";
   const emailV = email ?? customer?.email ?? "";
   const phoneV = phone ?? customer?.phone ?? "";
-  const branchShort = branch ? shortages(lines, branch) : [];
 
   async function place(e: FormEvent) {
     e.preventDefault();
@@ -70,8 +69,6 @@ export default function CheckoutPage() {
             <h2 className="text-lg">1. Where will you collect from?</h2>
             <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Pick-up branch">
               {data.branches.map((b) => {
-                const sh = shortages(lines, b.code);
-                const ok = sh.length === 0;
                 return (
                   <label key={b.code} data-testid={`branch-${b.code}`} className={cn("flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition-all duration-200 hover:border-primary/40",
                     branch === b.code && "border-primary ring-[3px] ring-primary/10")}>
@@ -79,14 +76,11 @@ export default function CheckoutPage() {
                     <span className="min-w-0 text-sm">
                       <span className="flex items-center gap-1 font-heading font-bold"><MapPin className="size-4 text-primary" />{b.name}</span>
                       <span className="block text-xs text-muted-foreground">{b.address}</span>
-                      {ok ? <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-success-fg"><CheckCircle2 className="size-3.5" />Everything in your cart is in stock</span>
-                        : <span className="mt-1 block text-xs font-semibold text-warning">{sh.length} item{sh.length === 1 ? "" : "s"} short: {sh.slice(0, 2).map((s) => `${s.name} (${s.available} left)`).join(", ")}{sh.length > 2 ? "…" : ""}</span>}
                     </span>
                   </label>
                 );
               })}
             </div>
-            {branch && branchShort.length > 0 && <p role="alert" className="text-sm text-warning">This branch cannot supply the full order yet — choose another branch or reduce quantities in your cart.</p>}
           </section>
 
           <section className="glass space-y-4 rounded-xl p-5 sm:p-6">
@@ -131,11 +125,11 @@ export default function CheckoutPage() {
           </dl>
           {problem && (
             <div role="alert" data-testid="checkout-error" className="rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm text-danger">
-              {problem.message}
-              {problem.short && <ul className="mt-1 list-disc pl-4 text-xs">{problem.short.map((s) => <li key={s.product_id}>{s.name}: only {s.available} available</li>)}</ul>}
+              {problem.short ? "We cannot complete this order yet:" : problem.message}
+              {problem.short && <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">{problem.short.map((s) => <li key={s.product_id}>{s.message}</li>)}</ul>}
             </div>
           )}
-          <Button type="submit" size="lg" className="w-full" disabled={busy || !data.open || !branch || branchShort.length > 0} data-testid="place-order">
+          <Button type="submit" size="lg" className="w-full" disabled={busy || !data.open || !branch} data-testid="place-order">
             {busy && <Loader2 className="animate-spin" data-icon="inline-start" />}Place order
           </Button>
           {!data.open && <p className="text-xs text-warning">The store is not taking orders right now.</p>}

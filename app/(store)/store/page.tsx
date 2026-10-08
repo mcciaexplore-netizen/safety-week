@@ -26,7 +26,7 @@ function Shop() {
   const products = useMemo(() => {
     if (!data) return [];
     let list = data.products.filter((p) => (category === "All" || (category === BEST ? p.best_seller : p.category === category)) && (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
-    if (inStockOnly && branch) list = list.filter((p) => (p.stock[branch] ?? 0) > 0);
+    if (inStockOnly && branch) list = list.filter((p) => p.stock_status[branch] !== "OUT");
     if (sort === "low") list = [...list].sort((a, b) => Number(a.price_incl_gst) - Number(b.price_incl_gst));
     if (sort === "high") list = [...list].sort((a, b) => Number(b.price_incl_gst) - Number(a.price_incl_gst));
     return list;
@@ -89,7 +89,6 @@ function Shop() {
 }
 
 function ProductCard({ p, branch, inCart }: { p: Product; branch: string | null; inCart: number }) {
-  const total = Object.values(p.stock).reduce((a, b) => a + b, 0); // only decides whether the button works
   return (
     <li className="card-lift glass flex flex-col rounded-xl p-4" data-testid="product-card">
       <ProductLink product={p} className="block">
@@ -103,7 +102,7 @@ function ProductCard({ p, branch, inCart }: { p: Product; branch: string | null;
       <PriceBlock product={p} className="mt-2" />
       <StockNote product={p} branch={branch} />
       <div className="mt-auto pt-4">
-        <Button className="w-full" variant={inCart ? "outline" : "default"} disabled={total === 0} onClick={() => storeActions.add(p.id)} aria-label={`Add ${p.name} to cart`}>
+        <Button className="w-full" variant={inCart ? "outline" : "default"} onClick={() => storeActions.add(p.id)} aria-label={`Add ${p.name} to cart`}>
           <ShoppingCart data-icon="inline-start" />{inCart ? `In cart (${inCart}) · add one more` : "Add to cart"}
         </Button>
       </div>
