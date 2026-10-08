@@ -34,7 +34,6 @@ export function LowStockButton({ routeKey }: { routeKey: string }) {
 
   const a = alerts.data;
   if (!a || a.count === 0) return null;
-  const critical = a.out > 0;
   return (
     <div ref={box} className="relative" data-testid="low-stock-alert">
       <button
@@ -44,11 +43,11 @@ export function LowStockButton({ routeKey }: { routeKey: string }) {
         onClick={() => setOpen((o) => !o)}
         title="Materials that are low or out of stock"
         className={cn("inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all duration-200 hover:-translate-y-0.5",
-          critical ? "border-danger/30 bg-danger/10 text-danger" : "border-warning/30 bg-warning/10 text-warning")}
+          "border-danger/30 bg-danger/10 text-danger")}
       >
         <AlertTriangle className="size-4" />
         <span>Low stock</span>
-        <span className={cn("grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[0.65rem] text-white", critical ? "bg-danger" : "bg-warning")}>{a.count}</span>
+        <span className="grid min-w-5 place-items-center rounded-full bg-danger px-1.5 py-0.5 text-[0.65rem] text-white">{a.count}</span>
       </button>
       {open && (
         <div role="menu" className="absolute right-0 z-40 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-xl border bg-white shadow-card-hover">
@@ -85,5 +84,24 @@ export function ProductStockFlag({ alerts }: { alerts: StockAlert[] }) {
       data-testid="product-stock-flag">
       <AlertTriangle className="size-3" />{out ? "Out" : "Low"} · {alerts.length} branch{alerts.length === 1 ? "" : "es"}
     </Link>
+  );
+}
+
+/** A red note at the top of the central-admin overview and the dashboard: how many materials are low / out, with a way to the Stock page. */
+export function LowStockBanner() {
+  const alerts = useStockAlerts(true, "banner");
+  const a = alerts.data;
+  if (!a || a.count === 0) return null;
+  const first = a.items.slice(0, 3).map((i) => `${i.name.replace(/\s+/g, " ")} (${i.branch_name}: ${when(i)})`).join(", ");
+  return (
+    <div role="alert" data-testid="low-stock-banner" className="flex flex-wrap items-center gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+      <AlertTriangle className="size-5 shrink-0" />
+      <p className="min-w-0 flex-1">
+        <strong>Low stock alert:</strong> {a.out > 0 && `${a.out} out of stock`}{a.out > 0 && a.low > 0 && " and "}{a.low > 0 && `${a.low} running low`}. {first}{a.count > 3 ? "…" : ""}
+      </p>
+      <Link href="/stock" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-danger/30 bg-white px-3 py-1.5 font-semibold hover:bg-danger/5">
+        Open the Stock page <ArrowRight className="size-4" />
+      </Link>
+    </div>
   );
 }

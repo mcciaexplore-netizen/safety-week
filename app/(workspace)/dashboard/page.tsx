@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FilePlus2, FileText, IndianRupee, Package, PencilLine } from "lucide-react";
 import { CountUp } from "@/components/app/count-up";
 import { GridBackdrop } from "@/components/app/grid-backdrop";
+import { LowStockBanner } from "@/components/app/low-stock-alert";
 import { LowStockCard } from "@/components/app/low-stock-card";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
@@ -53,6 +54,7 @@ export default function DashboardPage() {
         }
       />
       </div>
+      <LowStockBanner />
 
       {summary.error && (
         <ErrorState

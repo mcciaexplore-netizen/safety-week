@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, FileText, IndianRupee, Users } from "lucide-react";
+import { LowStockBanner } from "@/components/app/low-stock-alert";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
 import { useAsync } from "@/hooks/use-async";
@@ -39,6 +40,7 @@ export default function AdminOverview() {
   return (
     <>
       <PageHeader title="Admin overview" description={`${event.name} ${event.year} across all five branches.`} />
+      <LowStockBanner />
       {warnings.length > 0 && (
         <div className="space-y-2" role="region" aria-label="Needs attention">
           {warnings.map((w) => (
