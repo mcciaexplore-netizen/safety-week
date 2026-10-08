@@ -43,10 +43,11 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   const mug = page.getByTestId("product-card").filter({ hasText: "Coffee Mugs" });
   await expect(mug).toContainText("₹200.00");
   await expect(mug).toContainText("(₹236.00 incl. GST)");
-  await page.getByLabel("Pick-up branch").first().selectOption("TIL");
-  await expect(mug).toContainText("In stock at Tilak Road");
-  await page.getByLabel("Pick-up branch").first().selectOption("HAD");
-  await expect(mug).toContainText("Out of stock at Hadapsar");
+  // every card lists the stock at all five branches; clicking one chooses it as the pick-up branch
+  await expect(mug.getByTitle(/Tilak Road: 10 in stock/)).toBeVisible();
+  await expect(mug.getByTitle(/Hadapsar: out of stock/)).toBeVisible();
+  await mug.getByTitle(/Tilak Road: 10 in stock/).click();
+  await expect(page.getByLabel("Pick-up branch").first()).toHaveValue("TIL");
 
   // product page: stock at every branch, add two to the cart
   await mug.getByRole("link").first().click();

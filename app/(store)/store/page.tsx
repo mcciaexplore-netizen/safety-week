@@ -6,8 +6,8 @@ import { ShoppingCart } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BranchSelect, PriceBlock, ProductImage, ProductLink, StockLine } from "@/components/store/bits";
-import { storeActions, useCatalogue, useStore, type Product } from "@/lib/store/client";
+import { BranchSelect, BranchStockChips, PriceBlock, ProductImage, ProductLink } from "@/components/store/bits";
+import { storeActions, useCatalogue, useStore, type Branch, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 
@@ -53,7 +53,7 @@ function Shop() {
               </label>
               {branch && (
                 <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} /> In stock at {branchName}
+                  <input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} /> Hide items not in stock at {branchName}
                 </label>
               )}
             </div>
@@ -78,7 +78,7 @@ function Shop() {
           <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">Nothing matches. Try another category or search.</p>
         ) : (
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4" data-testid="product-grid">
-            {products.map((p) => <ProductCard key={p.id} p={p} branch={branch} branchName={branchName} inCart={cart[p.id] ?? 0} />)}
+            {products.map((p) => <ProductCard key={p.id} p={p} branches={data.branches} branch={branch} inCart={cart[p.id] ?? 0} />)}
           </ul>
         )}
       </section>
@@ -86,8 +86,7 @@ function Shop() {
   );
 }
 
-function ProductCard({ p, branch, branchName, inCart }: { p: Product; branch: string | null; branchName?: string; inCart: number }) {
-  const here = branch ? p.stock[branch] ?? 0 : null;
+function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Branch[]; branch: string | null; inCart: number }) {
   const total = Object.values(p.stock).reduce((a, b) => a + b, 0);
   return (
     <li className="card-lift glass flex flex-col rounded-xl p-4" data-testid="product-card">
@@ -97,9 +96,8 @@ function ProductCard({ p, branch, branchName, inCart }: { p: Product; branch: st
         <h3 className="mt-1 line-clamp-2 min-h-[2.5rem] font-heading text-base leading-snug font-bold">{p.name}</h3>
       </ProductLink>
       <PriceBlock product={p} className="mt-2" />
-      <div className="mt-1 min-h-5">
-        {here !== null ? <StockLine qty={here} branchName={branchName} /> : <span className="text-xs text-muted-foreground">{total > 0 ? "Choose a branch to see stock" : "Out of stock everywhere"}</span>}
-      </div>
+      <p className="label-xs mt-3">Stock at each branch</p>
+      <BranchStockChips stock={p.stock} branches={branches} selected={branch} onPick={storeActions.setBranch} />
       <div className="mt-auto pt-4">
         <Button className="w-full" variant={inCart ? "outline" : "default"} disabled={total === 0} onClick={() => storeActions.add(p.id)} aria-label={`Add ${p.name} to cart`}>
           <ShoppingCart data-icon="inline-start" />{inCart ? `In cart (${inCart}) · add one more` : "Add to cart"}
