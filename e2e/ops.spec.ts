@@ -14,11 +14,20 @@ async function signIn(page: Page, email: string, branch: string) {
 
 const isXlsx = async (path: string) => (await readFile(path)).subarray(0, 2).toString() === "PK"; // .xlsx is a zip file
 
-test("branch admin: stock -> low-stock card on the dashboard; one-click Excel of the day's invoices", async ({ page }) => {
+const API = process.env.API_URL ?? "http://localhost:8000";
+
+test("branch admin: stock -> low-stock card on the dashboard; one-click Excel of the day's invoices", async ({ page, request }) => {
   await signIn(page, "meera@example.invalid", "TIL");
+  // one issued invoice today, so there is something to bulk-download
+  const tok = (await (await request.post(`${API}/api/v1/dev/token`, { data: { email: "meera@example.invalid" } })).json()).access_token as string;
+  const h = { Authorization: `Bearer ${tok}` };
+  const prods = (await (await request.get(`${API}/api/v1/products`)).json()) as { id: string; name: string }[];
+  const made = await request.post(`${API}/api/v1/invoices`, { headers: h, data: { company_name: "Bulk Download Co", invoice_date: new Date().toISOString().slice(0, 10), action: "submit", items: [{ product_id: prods.find((x) => x.name === "Water Bottle")!.id, quantity: 1 }] } });
+  expect(made.status()).toBe(201);
 
   // stock: opening 5, low at 10 -> Badges shows up as low (or out, if earlier runs already sold more)
-  await page.getByRole("link", { name: "Stock" }).click();
+  await page.getByTestId("sidebar").getByRole("link", { name: "Stock", exact: true }).click();
+  await page.getByLabel("Opening stock for Badges").fill("");   // clear first, so a re-run on the same database still counts as a change
   await page.getByLabel("Opening stock for Badges").fill("5");
   await page.getByLabel("Low level for Badges").fill("10");
   await page.getByRole("button", { name: "Save stock" }).click();
@@ -33,6 +42,12 @@ test("branch admin: stock -> low-stock card on the dashboard; one-click Excel of
   await page.getByRole("link", { name: "Invoices", exact: true }).click();
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download Excel" }).click()]);
   expect(file.suggestedFilename()).toMatch(/^invoices-TIL-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  // a date range works too (Excel) and the PDFs come as a ZIP
+  await page.getByRole("button", { name: "Last 30 days" }).click();
+  const [range] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download Excel" }).click()]);
+  expect(range.suggestedFilename()).toMatch(/^invoices-TIL-\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2}\.xlsx$/);
+  const [zip] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDFs as a ZIP" }).click()]);
+  expect(zip.suggestedFilename()).toMatch(/^invoice-pdfs-TIL-.*\.zip$/);
   expect(await isXlsx((await file.path())!)).toBe(true);
   await expect(page.getByRole("button", { name: /All 5 branches combined/ })).toHaveCount(0); // central admin only
 
@@ -61,7 +76,7 @@ test("central admin: combined workbook for all five branches, and each branch se
     expect(one.suggestedFilename()).toMatch(new RegExp(`^invoices-${code}-\\d{4}-\\d{2}-\\d{2}\\.xlsx$`));
   }
   // the central admin can also look at any branch's stock
-  await page.getByRole("link", { name: "Stock" }).click();
+  await page.getByTestId("sidebar").getByRole("link", { name: "Stock", exact: true }).click();
   await expect(page.getByTestId("stock-matrix-row")).toHaveCount(39);          // all five branches at once
   await page.getByRole("tab", { name: "Set opening stock" }).click();
   await page.getByLabel("Branch").selectOption("BHO");

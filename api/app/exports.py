@@ -1,4 +1,4 @@
-"""Bulk Excel download of one day's invoices.
+"""Bulk download of invoices for one day or a date range: one Excel workbook, or a ZIP of the PDFs.
 
 One workbook: a Summary tab, then one tab per invoice laid out like the MCCIA invoice sheet.
 Tab name = branch code + invoice sequence + company, e.g. "TIL-000007 Sahyadri Precision".
@@ -10,6 +10,7 @@ and the database's row level security hides other branches' rows.
 
 import io
 import re
+import zipfile
 from datetime import date
 from typing import Annotated
 
@@ -163,10 +164,11 @@ def invoice_sheet(wb: Workbook, inv: Invoice, products: list[Product], header: d
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
 
-def summary_sheet(wb: Workbook, invoices: list[Invoice], day: date, scope: str, codes: dict) -> None:
+def summary_sheet(wb: Workbook, invoices: list[Invoice], day: date, scope: str, codes: dict, day_to: date | None = None) -> None:
     ws = wb.active
     ws.title = "Summary"
-    ws["A1"] = f"Proforma Invoices - {day.strftime('%d/%b/%Y')} - {scope}"
+    span = day.strftime('%d/%b/%Y') if not day_to or day_to == day else f"{day.strftime('%d/%b/%Y')} to {day_to.strftime('%d/%b/%Y')}"
+    ws["A1"] = f"Proforma Invoices - {span} - {scope}"
     ws["A1"].font = Font(name="Calibri", bold=True, size=13)
     head = ["Branch", "Invoice No.", "Company", "Status", "Payment", "Items qty", "Amount (Rs.)"]
     for i, h in enumerate(head, 1):
@@ -207,15 +209,21 @@ def summary_sheet(wb: Workbook, invoices: list[Invoice], day: date, scope: str, 
     ws.freeze_panes = "A4"
 
 
-@router.get("/daily-invoices")
-def daily_invoices(
-    day: Annotated[date, Query(alias="date")],
-    branch: Annotated[str | None, Query(max_length=3)] = None,
-    s: Session = Depends(get_session),
-    p: Principal = Depends(current_principal),
-):
+MAX_RANGE_DAYS = 92
+MAX_ZIP_INVOICES = 60  # PDFs are built on demand if missing, so a ZIP is kept small enough to finish quickly
+
+
+def _range_and_scope(s: Session, p: Principal, day: date | None, date_from: date | None, date_to: date | None, branch: str | None):
+    """Who may download what, which dates, and the branch scope. A single `date`, or `date_from` + `date_to` (inclusive)."""
     if not p.is_admin:
-        raise HTTPException(403, "Only an admin can download the day's invoices")
+        raise HTTPException(403, "Only an admin can download invoices in bulk")
+    d_from, d_to = (day, day) if day else (date_from, date_to)
+    if d_from is None or d_to is None:
+        raise HTTPException(422, "Choose the dates (from and to)")
+    if d_to < d_from:
+        raise HTTPException(422, "The 'to' date is before the 'from' date")
+    if (d_to - d_from).days > MAX_RANGE_DAYS:
+        raise HTTPException(422, f"Please choose a range of at most {MAX_RANGE_DAYS} days")
     if p.is_super:
         code = (branch or "ALL").upper()
         if code != "ALL" and repo.get_branch_by_code(s, code) is None:
@@ -224,28 +232,79 @@ def daily_invoices(
         if branch is not None and branch.upper() != _own_code(s, p):
             raise HTTPException(403, "You can download your own branch only")
         code = _own_code(s, p)
-
     rows = services.list_invoices(s, p, None if code == "ALL" else (code if p.is_super else None),
-                                  date_from=day, date_to=day, limit=500)
+                                  date_from=d_from, date_to=d_to, limit=500)
     rows = [i for i in rows if i.status in admin.COUNTED]  # drafts and cancelled invoices are not "issued"
+    return d_from, d_to, code, rows
+
+
+def _stamp(d_from: date, d_to: date) -> str:
+    return d_from.isoformat() if d_from == d_to else f"{d_from.isoformat()}_to_{d_to.isoformat()}"
+
+
+@router.get("/daily-invoices")
+def daily_invoices(
+    day: Annotated[date | None, Query(alias="date")] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    branch: Annotated[str | None, Query(max_length=3)] = None,
+    s: Session = Depends(get_session),
+    p: Principal = Depends(current_principal),
+):
+    """One Excel workbook (a Summary tab, then one tab per invoice) for one day or a date range."""
+    d_from, d_to, code, rows = _range_and_scope(s, p, day, date_from, date_to, branch)
     event = repo.current_event(s)
     products = repo.list_products(s, event.id) if event else []
     header = admin.read_header(s)
     codes = {b.id: b.code for b in repo.list_branches(s)}
 
     wb = Workbook()
-    summary_sheet(wb, rows, day, "all branches" if code == "ALL" else f"branch {code}", codes)
+    summary_sheet(wb, rows, d_from, "all branches" if code == "ALL" else f"branch {code}", codes, d_to)
     taken = {"summary"}
     for inv in sorted(rows, key=lambda i: i.invoice_number.split("-")[1:]):
         invoice_sheet(wb, inv, products, header, taken)
 
     services.log_event(s, p, "report.export", entity_type="report", branch_id=None if code == "ALL" else rows[0].branch_id if rows else p.branch_id,
-                       kind="daily-invoices", date=day.isoformat(), branch=code, invoices=len(rows))
+                       kind="daily-invoices", date=d_from.isoformat(), date_to=d_to.isoformat(), branch=code, invoices=len(rows))
     s.commit()
     buf = io.BytesIO()
     wb.save(buf)
     return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": f'attachment; filename="invoices-{code}-{day.isoformat()}.xlsx"',
+                    headers={"Content-Disposition": f'attachment; filename="invoices-{code}-{_stamp(d_from, d_to)}.xlsx"',
+                             "Cache-Control": "no-store"})
+
+
+@router.get("/invoice-pdfs")
+def invoice_pdfs(
+    day: Annotated[date | None, Query(alias="date")] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    branch: Annotated[str | None, Query(max_length=3)] = None,
+    s: Session = Depends(get_session),
+    p: Principal = Depends(current_principal),
+):
+    """A ZIP with each invoice's current PDF for one day or a date range (same scope rules as the Excel download)."""
+    from . import documents  # local import: documents imports this package's siblings
+
+    d_from, d_to, code, rows = _range_and_scope(s, p, day, date_from, date_to, branch)
+    if not rows:
+        raise HTTPException(404, "No issued invoices in those dates")
+    if len(rows) > MAX_ZIP_INVOICES:
+        raise HTTPException(422, f"{len(rows)} invoices match - a ZIP holds at most {MAX_ZIP_INVOICES}. Please choose fewer days (or one branch).")
+    codes = {b.id: b.code for b in repo.list_branches(s)}
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for inv in sorted(rows, key=lambda i: i.invoice_number):
+            try:
+                data, name = documents.read_document(s, p, inv.id, None)
+            except (services.Unavailable, services.Conflict, services.NotFound) as e:
+                raise HTTPException(503, f"Could not prepare {inv.invoice_number}: {e}") from None
+            z.writestr(f"{codes[inv.branch_id]}/{name}" if code == "ALL" else name, data)
+    services.log_event(s, p, "report.export", entity_type="report", branch_id=None if code == "ALL" else rows[0].branch_id,
+                       kind="invoice-pdfs", date=d_from.isoformat(), date_to=d_to.isoformat(), branch=code, invoices=len(rows))
+    s.commit()
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="invoice-pdfs-{code}-{_stamp(d_from, d_to)}.zip"',
                              "Cache-Control": "no-store"})
 
 
