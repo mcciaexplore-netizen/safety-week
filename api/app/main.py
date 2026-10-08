@@ -11,7 +11,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import admin, documents, exports, login, stock, store, store_orders, store_pay
+from . import admin, counter_pay, documents, exports, login, stock, store, store_orders, store_pay
 from . import repositories as repo
 from . import services
 from .auth import Principal, current_principal
@@ -262,6 +262,7 @@ app.include_router(stock.router)
 app.include_router(login.router)
 app.include_router(store.router)
 app.include_router(store_pay.router)
+app.include_router(counter_pay.router)
 app.include_router(store_orders.router)
 app.include_router(store_orders.analytics_router)
 app.include_router(exports.router)

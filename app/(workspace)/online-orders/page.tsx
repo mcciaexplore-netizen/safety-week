@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { CheckCheck, PackageCheck, XCircle } from "lucide-react";
-import { EditDialog, str, type FieldSpec } from "@/components/admin/edit-dialog";
+import { EditDialog, str } from "@/components/admin/edit-dialog";
 import { PageHeader } from "@/components/app/page-header";
+import { PickupDialog } from "@/components/app/pickup-dialog";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/app/states";
 import { OrderStatusPill } from "@/components/store/bits";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ import type { Order } from "@/lib/store/client";
 type Row = Order & { id: string };
 const TABS: [string, string][] = [["OPEN", "To prepare / hand over"], ["PENDING_PAYMENT", "Awaiting payment"], ["READY", "Ready for pick-up"], ["PICKED_UP", "Collected"], ["CANCELLED", "Cancelled"], ["EXPIRED", "Released"]];
 const BRANCHES: [string, string][] = [["", "All branches"], ["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]];
-const MODES: [string, string][] = [["CASH", "Cash"], ["RAZORPAY", "Razorpay (UPI / card)"]];
 const SEL = "h-9 rounded-lg border border-input bg-white px-3 text-sm";
 
 export default function OnlineOrdersPage() {
@@ -45,10 +45,6 @@ export default function OnlineOrdersPage() {
     finally { setBusy(null); }
   }
 
-  const pickupFields: FieldSpec[] = [
-    { key: "payment_mode", label: "How did the customer pay?", type: "select", options: MODES, wide: true, hint: "The full amount is recorded on the invoice." },
-    { key: "reference", label: "Reference (UTR / receipt no., optional)", wide: true },
-  ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -91,13 +87,7 @@ export default function OnlineOrdersPage() {
           </table>
         </div>
       )}
-      {dialog?.kind === "pickup" && (
-        <EditDialog key={dialog.order.id} title={`Hand over ${dialog.order.number}`}
-          description={dialog.order.payment_status === "PAID" ? "Already paid online - just confirm the hand-over." : `Collect ${formatRupees(Number(dialog.order.total))} from ${dialog.order.customer.name}.`}
-          fields={dialog.order.payment_status === "PAID" ? [] : pickupFields} initial={{ payment_mode: "CASH", reference: "" }} submitLabel="Confirm hand-over"
-          onSave={async (v) => { await api(`/store-orders/${dialog.order.id}/pickup`, { method: "POST", body: JSON.stringify(dialog.order.payment_status === "PAID" ? {} : { payment_mode: v.payment_mode, reference: str(v.reference) }) }); list.reload(); }}
-          onClose={() => setDialog(null)} />
-      )}
+      {dialog?.kind === "pickup" && <PickupDialog key={dialog.order.id} order={dialog.order} onClose={() => setDialog(null)} onDone={() => list.reload()} />}
       {dialog?.kind === "cancel" && (
         <EditDialog key={`c-${dialog.order.id}`} title={`Cancel ${dialog.order.number}`} description={dialog.order.payment_status === "PAID" ? `The customer paid ${formatRupees(Number(dialog.order.total))} online: the FULL amount is refunded through Razorpay, the items go back into stock and the customer is e-mailed.` : "The items go back into stock and the customer is e-mailed."}
           fields={[{ key: "reason", label: "Reason", wide: true }]} initial={{ reason: "" }} submitLabel={dialog.order.payment_status === "PAID" ? "Cancel and refund" : "Cancel order"}

@@ -38,7 +38,7 @@ test("payment: one mode takes the full amount automatically and follows the tota
   await expect(page.getByTestId("payment-status")).toHaveText("Paid in full");
   // only two ways to pay are offered: cash, or Razorpay (UPI / card / net banking go through Razorpay)
   const options = await page.getByLabel("Mode of payment").locator("option").allTextContents();
-  expect(options).toEqual(["Not paid yet", "Cash", "Razorpay"]);
+  expect(options).toEqual(["Not paid yet", "Cash", "Razorpay UPI"]);
   await page.getByLabel("Mode of payment").selectOption("");
   await inPreview(page, () => expect(paperPayment(page)).not.toContainText("Rs."));
 });

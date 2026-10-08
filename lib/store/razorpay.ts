@@ -43,6 +43,8 @@ export async function payForOrder(order: Order, auth: { token?: string | null; t
       description: `Order ${order.number}`,
       prefill: { name: order.customer.name, email: order.customer.email, contact: order.customer.phone },
       theme: { color: "#003F8A" },
+      // customers can pay by UPI, card or net banking
+      method: { upi: true, card: true, netbanking: true, wallet: false, emi: false, paylater: false },
       modal: { ondismiss: () => resolve(null) },
       handler: async (reply: RazorpayReply) => {
         try {

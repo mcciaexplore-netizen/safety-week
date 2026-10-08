@@ -4,6 +4,9 @@ import type { InvoicePayment, PaymentMode, PaymentStatus } from "@/lib/types";
  *  Older invoices may still carry UPI / Card / Net banking / Other, so those keep their labels below. */
 export const PAYMENT_MODES: PaymentMode[] = ["CASH", "RAZORPAY"];
 
+/** The two choices staff are offered (invoices show the shorter PAYMENT_LABEL). */
+export const PAYMENT_OPTION_LABEL: Record<"CASH" | "RAZORPAY", string> = { CASH: "Cash", RAZORPAY: "Razorpay UPI" };
+
 export const PAYMENT_LABEL: Record<PaymentMode, string> = {
   CASH: "Cash",
   RAZORPAY: "Razorpay",
@@ -16,7 +19,7 @@ export const PAYMENT_LABEL: Record<PaymentMode, string> = {
 /** What to type in the reference box for each mode. */
 export const REFERENCE_HINT: Record<PaymentMode, string> = {
   CASH: "Receipt no. (optional)",
-  RAZORPAY: "Razorpay payment ID (pay_…) - optional",
+  RAZORPAY: "Filled in automatically once the customer has paid",
   UPI: "UTR / transaction no.",
   CARD: "Card slip / approval no.",
   NET_BANKING: "UTR / reference no.",

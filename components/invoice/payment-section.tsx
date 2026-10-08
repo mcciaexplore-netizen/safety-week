@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatRupees } from "@/lib/format";
 import { newKey, type InvoiceDraft, type InvoiceView } from "@/lib/invoice/model";
-import { PAYMENT_LABEL, PAYMENT_MODES, REFERENCE_HINT } from "@/lib/invoice/payments";
+import { RazorpayCollect, useRazorpayEnabled } from "@/components/app/razorpay-collect";
+import { PAYMENT_OPTION_LABEL, PAYMENT_MODES, REFERENCE_HINT } from "@/lib/invoice/payments";
 import type { FieldErrors } from "@/lib/invoice/validation";
 import type { PaymentMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export function PaymentSection({
   const payable = view.totals.roundedTotal;
   const { paid, balance, status } = view.paymentSummary;
   const rows = draft.payments;
+  const rzp = useRazorpayEnabled(); // when on, a Razorpay payment is collected with a QR and its id fills in by itself
 
   const setRow = (key: string, patch: Partial<InvoiceDraft["payments"][number]>) =>
     update((d) => ({ ...d, payments: d.payments.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
@@ -84,7 +86,7 @@ export function PaymentSection({
           <select id="pay-mode-0" className={SELECT} value={rows[0]?.mode ?? ""} onChange={(e) => chooseSingle(e.target.value)}>
             <option value="">Not paid yet</option>
             {PAYMENT_MODES.map((m) => (
-              <option key={m} value={m}>{PAYMENT_LABEL[m]}</option>
+              <option key={m} value={m}>{PAYMENT_OPTION_LABEL[m as "CASH" | "RAZORPAY"]}</option>
             ))}
           </select>
           {rows[0] ? (
@@ -93,6 +95,7 @@ export function PaymentSection({
                 aria-label="Payment reference"
                 placeholder={REFERENCE_HINT[rows[0].mode]}
                 value={rows[0].reference}
+                readOnly={rzp && rows[0].mode === "RAZORPAY"}
                 onChange={(e) => setRow(rows[0].key, { reference: e.target.value })}
                 aria-invalid={!!errors["payments.0.reference"]}
               />
@@ -106,8 +109,13 @@ export function PaymentSection({
           </Button>
           {rows[0] && (
             <p className="text-base text-muted-foreground sm:col-span-3">
-              Full amount received: <strong className="text-foreground">{formatRupees(payable)}</strong>
+              {rzp && rows[0].mode === "RAZORPAY" ? "Full amount to collect" : "Full amount received"}: <strong className="text-foreground">{formatRupees(payable)}</strong>
             </p>
+          )}
+          {rzp && rows[0]?.mode === "RAZORPAY" && (
+            <div className="sm:col-span-3">
+              <RazorpayCollect amount={payable} paidId={rows[0].reference} onPaid={(id) => setRow(rows[0].key, { reference: id })} />
+            </div>
           )}
         </div>
       ) : (
@@ -125,7 +133,7 @@ export function PaymentSection({
                 onChange={(e) => setRow(r.key, { mode: e.target.value as PaymentMode })}
               >
                 {PAYMENT_MODES.map((m) => (
-                  <option key={m} value={m}>{PAYMENT_LABEL[m]}</option>
+                  <option key={m} value={m}>{PAYMENT_OPTION_LABEL[m as "CASH" | "RAZORPAY"]}</option>
                 ))}
               </select>
               <div>
@@ -146,6 +154,7 @@ export function PaymentSection({
                   aria-label={`Reference for payment ${i + 1}`}
                   placeholder={REFERENCE_HINT[r.mode]}
                   value={r.reference}
+                  readOnly={rzp && r.mode === "RAZORPAY"}
                   onChange={(e) => setRow(r.key, { reference: e.target.value })}
                   aria-invalid={!!errors[`payments.${i}.reference`]}
                 />
@@ -161,6 +170,11 @@ export function PaymentSection({
               >
                 Fill balance
               </Button>
+              {rzp && r.mode === "RAZORPAY" && (
+                <div className="sm:col-span-5">
+                  <RazorpayCollect amount={r.amount} paidId={r.reference} onPaid={(id) => setRow(r.key, { reference: id })} />
+                </div>
+              )}
               <Button
                 type="button"
                 variant="ghost"

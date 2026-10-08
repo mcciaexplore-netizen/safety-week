@@ -187,6 +187,15 @@ def _check_stock(s: Session, branch, event, items: list[InvoiceItem], mine: dict
             raise Invalid(f"Only {max(allowed, 0)} of {' '.join(it.particulars.split())} in stock at {branch.name}")
 
 
+def _verify_razorpay(s: Session, payments: list[InvoicePayment], invoice_id=None, already: set[str] | None = None) -> None:
+    """Every Razorpay payment on a submitted invoice must be a real, matching, unused Razorpay payment (see counter_pay)."""
+    from .counter_pay import verify_reference  # local import: counter_pay imports this module
+
+    for pay in payments:
+        if pay.mode == "RAZORPAY" and pay.reference not in (already or set()):
+            verify_reference(s, pay.reference, pay.amount, invoice_id)
+
+
 def create_invoice(s: Session, p: Principal, data: InvoiceCreate, branch_code: str | None = None) -> Invoice:
     branch = _branch_for(s, p, branch_code)  # branch comes from the account, never the payload
     event = repo.current_event(s)
@@ -195,10 +204,13 @@ def create_invoice(s: Session, p: Principal, data: InvoiceCreate, branch_code: s
     items, totals = _calculate(s, p, data, event)
     if data.action == "submit":
         _check_stock(s, branch, event, items)
+    new_payments = _build_payments(data, totals["grand_total"])
+    if data.action == "submit":
+        _verify_razorpay(s, new_payments)
     invoice = Invoice(
         invoice_number=allocate_invoice_number(s, branch.code), event_id=event.id, branch_id=branch.id,
         created_by=p.user_id, created_by_name=p.name, status="SUBMITTED" if data.action == "submit" else "DRAFT",
-        items=items, payments=_build_payments(data, totals["grand_total"]), **_fields(data), **totals)
+        items=items, payments=new_payments, **_fields(data), **totals)
     repo.add(s, invoice)
     s.refresh(invoice)  # from here on, values are exactly what the database stored
     if invoice.status == "SUBMITTED":
@@ -226,6 +238,8 @@ def update_invoice(s: Session, p: Principal, invoice_id: uuid.UUID, data: Invoic
     for key, value in {**_fields(data), **totals}.items():
         setattr(invoice, key, value)
     new_payments = _build_payments(data, totals["grand_total"])
+    if not (was_draft and data.action != "submit"):  # submitted / revised: the Razorpay payments must be real
+        _verify_razorpay(s, new_payments, invoice.id, {x.reference for x in invoice.payments if x.mode == "RAZORPAY"})
     invoice.items.clear()
     invoice.payments.clear()
     s.flush()  # delete the old lines first: (invoice_id, line_order) is unique

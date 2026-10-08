@@ -99,6 +99,13 @@ def mark_picked_up(order_id: uuid.UUID, body: PickupIn, s: Sess, p: Me):
             raise HTTPException(422, "Say how the customer paid")
         if body.payment_mode == "OTHER" and not body.reference.strip():
             raise HTTPException(422, "Say how it was paid")
+        if body.payment_mode == "RAZORPAY":
+            from .counter_pay import verify_reference
+
+            try:
+                verify_reference(s, body.reference, inv.grand_total, inv.id)
+            except services.Invalid as ex:
+                raise HTTPException(422, str(ex)) from None
         inv.payments.append(InvoicePayment(id=uuid.uuid4(), mode=body.payment_mode, amount=inv.grand_total,
                                            reference=body.reference.strip(), line_order=1))
         inv.version, inv.status = inv.version + 1, "EDITED"

@@ -20,7 +20,7 @@ POSTER = "Posters 5-S"  # rate 130 + 18% GST: 2 of them = 306.80 -> Rs 307.00 = 
 
 class FakeRazorpay:
     def __init__(self):
-        self.orders, self.payments, self.refunds = {}, {}, []
+        self.orders, self.payments, self.refunds, self.qrs, self.qr_paid = {}, {}, [], {}, {}
 
     def create_order(self, amount_paise, receipt, notes=None):
         oid = f"order_T{len(self.orders):04d}"
@@ -33,7 +33,28 @@ class FakeRazorpay:
         return pid
 
     def fetch_payment(self, pid):
+        if pid not in self.payments:
+            raise razorpay.RazorpayError("The id provided does not exist")
         return self.payments[pid]
+
+    def create_qr(self, amount_paise, name, description, notes=None, close_by=None):
+        qid = f"qr_T{len(self.qrs):04d}"
+        self.qrs[qid] = {"id": qid, "image_url": f"https://rzp.io/{qid}", "payment_amount": amount_paise, "status": "active", "notes": notes or {}, "close_by": close_by}
+        self.qr_paid[qid] = []
+        return self.qrs[qid]
+
+    def fetch_qr(self, qid):
+        return self.qrs[qid]
+
+    def qr_payments(self, qid):
+        return self.qr_paid[qid]
+
+    def scan_and_pay(self, qid, amount=None):
+        pid = f"pay_Q{len(self.payments):04d}"
+        pay = {"id": pid, "order_id": None, "status": "captured", "amount": amount or self.qrs[qid]["payment_amount"]}
+        self.payments[pid] = pay
+        self.qr_paid[qid].append(pay)
+        return pid
 
     def capture(self, pid, amount):
         self.payments[pid]["status"] = "captured"
@@ -50,7 +71,7 @@ def rz():
     saved = (settings.razorpay_key_id, settings.razorpay_key_secret, settings.razorpay_webhook_secret, settings.email_backend)
     settings.razorpay_key_id, settings.razorpay_key_secret, settings.razorpay_webhook_secret, settings.email_backend = KEY, SECRET, HOOK, "memory"
     mp = pytest.MonkeyPatch()
-    for name in ("create_order", "fetch_payment", "capture", "refund"):
+    for name in ("create_order", "fetch_payment", "capture", "refund", "create_qr", "fetch_qr", "qr_payments"):
         mp.setattr(razorpay, name, getattr(fake, name))
     with engine.begin() as c:
         before = c.execute(text("select status from events where invoice_prefix = 'NSW27'")).scalar()
@@ -196,3 +217,73 @@ def test_unpaid_online_orders_are_not_counted_as_sales(client, people, prods, rz
     assert hook(client, "payment.captured", rid, rz.pay(rid), o["payment"]["amount"]).status_code == 200
     after = client.get(f"{API}/admin/store/analytics", headers=people["super"]["h"]).json()["totals"]
     assert after["online_orders"] == before["online_orders"] + 1
+
+
+# ---------------------------------------------------------------- counter payments (staff: cash or Razorpay UPI)
+def staff_invoice(client, people, prods, who, qty, **extra):
+    return client.post(f"{API}/invoices", headers=people[who]["h"], json={
+        "company_name": "Counter Co", "invoice_date": "2027-03-03", "action": "submit",
+        "items": [{"product_id": prods["Slogans - 10 x 15"], "quantity": qty}], **extra})
+
+
+def test_counter_qr_is_created_for_the_exact_amount_and_reports_paid(client, people, prods, rz):
+    h = people["til"]["h"]
+    assert client.get(f"{API}/payments/config", headers=h).json() == {"razorpay": True}
+    r = client.post(f"{API}/payments/razorpay-qr", headers=h, json={"amount": "94.40", "note": "Counter Co"})
+    assert r.status_code == 200
+    qr = r.json()
+    assert qr["amount"] == "94.40" and qr["image_url"].startswith("https://rzp.io/") and rz.qrs[qr["id"]]["payment_amount"] == 9440
+    assert rz.qrs[qr["id"]]["notes"]["branch"] == "TIL"
+    assert client.get(f"{API}/payments/razorpay-qr/{qr['id']}", headers=h).json() == {"status": "waiting"}
+    pid = rz.scan_and_pay(qr["id"])
+    got = client.get(f"{API}/payments/razorpay-qr/{qr['id']}", headers=h).json()
+    assert got == {"status": "paid", "payment_id": pid, "amount": "94.40"}
+    # another branch cannot look at this QR; the central admin can; nobody unauthenticated
+    assert client.get(f"{API}/payments/razorpay-qr/{qr['id']}", headers=people["sbr"]["h"]).status_code == 404
+    assert client.get(f"{API}/payments/razorpay-qr/{qr['id']}", headers=people["super"]["h"]).status_code == 200
+    assert client.get(f"{API}/payments/razorpay-qr/{qr['id']}").status_code == 401
+    assert client.post(f"{API}/payments/razorpay-qr", headers=h, json={"amount": "0"}).status_code == 422
+    assert client.post(f"{API}/payments/razorpay-qr", headers=h, json={"amount": "5000000"}).status_code == 422
+    assert client.get(f"{API}/payments/razorpay-qr/not-a-qr", headers=h).status_code == 404
+    assert client.get(f"{API}/payments/razorpay-qr/{rz.create_qr(100, 'x', 'y')['id']}", headers=h).status_code == 404   # a QR with no branch note is nobody's
+
+
+def test_a_razorpay_payment_on_an_invoice_must_be_real(client, people, prods, rz):
+    h = people["til"]["h"]
+    # Slogans - 10 x 15: rate 80 + 18% = 94.40 -> Rs 94.00 payable
+    qr = client.post(f"{API}/payments/razorpay-qr", headers=h, json={"amount": "94.00"}).json()
+    pid = rz.scan_and_pay(qr["id"])
+    pay = lambda ref, amt="94.00": [{"mode": "RAZORPAY", "amount": amt, "reference": ref}]
+    assert staff_invoice(client, people, prods, "til", 1, payments=pay("")).status_code == 422                 # no payment id: not accepted
+    assert staff_invoice(client, people, prods, "til", 1, payments=pay("made-up")).status_code == 422
+    assert staff_invoice(client, people, prods, "til", 1, payments=pay("pay_DoesNotExist")).status_code == 422   # Razorpay has never heard of it
+    rz.payments["pay_Short1"] = {"id": "pay_Short1", "order_id": None, "status": "captured", "amount": 5000}
+    assert staff_invoice(client, people, prods, "til", 1, payments=pay("pay_Short1")).status_code == 422       # Rs 50 was paid, not Rs 94
+    rz.payments["pay_Fail1"] = {"id": "pay_Fail1", "order_id": None, "status": "failed", "amount": 9400}
+    assert staff_invoice(client, people, prods, "til", 1, payments=pay("pay_Fail1")).status_code == 422        # not completed
+    assert staff_invoice(client, people, prods, "til", 1, payments=pay(pid), action="draft").status_code == 201  # a draft is only a note
+    ok = staff_invoice(client, people, prods, "til", 1, payments=pay(pid))
+    assert ok.status_code == 201 and ok.json()["payments"][0]["reference"] == pid and ok.json()["payment_status"] == "PAID"
+    again = staff_invoice(client, people, prods, "sbr", 1, payments=pay(pid))                                    # the same money cannot pay two invoices
+    assert again.status_code == 422 and "already recorded" in again.json()["detail"]
+    # revising the invoice keeps its own payment without asking Razorpay again for a new one
+    inv = ok.json()
+    rev = client.put(f"{API}/invoices/{inv['id']}", headers=h, json={"company_name": "Counter Co", "invoice_date": "2027-03-03", "action": "submit", "edit_reason": "name",
+                                                                      "items": [{"product_id": prods["Slogans - 10 x 15"], "quantity": 1}], "payments": pay(pid)})
+    assert rev.status_code == 200
+    # cash is never checked with Razorpay
+    cash = staff_invoice(client, people, prods, "til", 1, payments=[{"mode": "CASH", "amount": "94.00", "reference": ""}])
+    assert cash.status_code == 201
+
+
+def test_branch_handover_with_razorpay_needs_the_real_payment(client, people, prods, rz):
+    stock_for(client, people, prods, "TIL", POSTER, 10)
+    o = client.post(f"{S}/orders", json=order_body(prods, lines=((POSTER, 1),), email="counter@example.com")).json()          # pay at pick-up
+    row = next(x for x in client.get(f"{API}/store-orders", headers=people["til"]["h"]).json() if x["number"] == o["number"])
+    url = f"{API}/store-orders/{row['id']}/pickup"
+    assert client.post(url, headers=people["til"]["h"], json={"payment_mode": "RAZORPAY"}).status_code == 422
+    assert client.post(url, headers=people["til"]["h"], json={"payment_mode": "RAZORPAY", "reference": "pay_Nope123"}).status_code == 422
+    qr = client.post(f"{API}/payments/razorpay-qr", headers=people["til"]["h"], json={"amount": o["total"]}).json()
+    pid = rz.scan_and_pay(qr["id"])
+    done = client.post(url, headers=people["til"]["h"], json={"payment_mode": "RAZORPAY", "reference": pid})
+    assert done.status_code == 200 and (done.json()["status"], done.json()["payment_status"]) == ("PICKED_UP", "PAID")

@@ -63,6 +63,23 @@ def refund(payment_id: str, amount_paise: int, notes: dict | None = None) -> dic
     return _call("POST", f"/payments/{payment_id}/refund", json={"amount": amount_paise, "notes": notes or {}})
 
 
+def create_qr(amount_paise: int, name: str, description: str, notes: dict | None = None, close_by: int | None = None) -> dict:
+    """A single-use UPI QR code for exactly this amount (the counter payment)."""
+    body = {"type": "upi_qr", "name": name[:40], "usage": "single_use", "fixed_amount": True, "payment_amount": amount_paise,
+            "description": description[:100], "notes": notes or {}}
+    if close_by:
+        body["close_by"] = close_by
+    return _call("POST", "/payments/qr_codes", json=body)
+
+
+def fetch_qr(qr_id: str) -> dict:
+    return _call("GET", f"/payments/qr_codes/{qr_id}")
+
+
+def qr_payments(qr_id: str) -> list[dict]:
+    return _call("GET", f"/payments/qr_codes/{qr_id}/payments").get("items", [])
+
+
 def _same(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode(), b.encode())
 
