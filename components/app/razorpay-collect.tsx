@@ -79,20 +79,21 @@ export function RazorpayCollect({ amount, paidId, onPaid }: { amount: number; pa
           </span>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-4">
-          {qr.image_url ? (
-            // Razorpay's QR card is tall; show it in proportion, and open it full size on click (easier to scan from a phone)
-            <a href={qr.image_url} target="_blank" rel="noreferrer" title="Open the QR full size">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr.image_url} alt={`UPI QR for ${formatRupees(amount)}`} className="h-80 w-auto max-w-full rounded-lg border bg-white object-contain" data-testid="qr-image" />
-            </a>
-          ) : <QrCode className="size-16 text-primary" />}
-          <div className="space-y-2">
-            <p className="font-heading text-lg font-bold">{formatRupees(Number(qr.amount))}</p>
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <div className="space-y-1">
+            <p className="font-heading text-2xl font-bold">{formatRupees(Number(qr.amount))}</p>
             <p className="text-muted-foreground">Ask the customer to scan this with any UPI app.</p>
-            <p className="flex items-center gap-2 font-medium text-primary"><Loader2 className="size-4 animate-spin" />Waiting for payment…</p>
-            <Button type="button" variant="outline" size="sm" onClick={() => { setQr(null); setState("idle"); }}>Cancel QR</Button>
+            <p className="flex items-center justify-center gap-2 font-medium text-primary"><Loader2 className="size-4 animate-spin" />Waiting for payment…</p>
           </div>
+          {qr.image_url ? (
+            // Razorpay's QR card is tall with the code in the middle of it: centre it and make it as large as the screen allows
+            // so the code itself is big enough to scan from a phone; click opens it full size.
+            <a href={qr.image_url} target="_blank" rel="noreferrer" title="Open the QR full size" className="block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qr.image_url} alt={`UPI QR for ${formatRupees(amount)}`} className="mx-auto h-[min(40rem,75vh)] w-auto max-w-full rounded-lg border bg-white object-contain shadow-sm" data-testid="qr-image" />
+            </a>
+          ) : <QrCode className="size-24 text-primary" />}
+          <Button type="button" variant="outline" size="sm" onClick={() => { setQr(null); setState("idle"); }}>Cancel QR</Button>
         </div>
       )}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
