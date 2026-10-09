@@ -55,7 +55,7 @@ def test_part_payment_leaves_a_balance_and_can_be_completed_later(client, people
     assert inv["payment_status"] == "PARTIAL" and float(inv["amount_paid"]) == 1000.0
     # the customer pays the rest in cash: a revision (with its reason) records it; the old version keeps the old picture
     rest = body(prods, [{"mode": "UPI", "amount": "1000", "reference": "UTR 1"}, {"mode": "CASH", "amount": "2938"}], edit_reason="balance paid in cash")
-    r = client.put(f"{API}/invoices/{inv['id']}", json=rest, headers=h)
+    r = client.put(f"{API}/invoices/{inv['id']}", json=rest, headers=people["super"]["h"])  # only the central admin revises
     assert r.status_code == 200 and r.json()["payment_status"] == "PAID" and len(r.json()["payments"]) == 2
     versions = client.get(f"{API}/invoices/{inv['id']}/versions/1", headers=people["til_admin"]["h"]).json()
     assert versions["payment_status"] == "PARTIAL" and len(versions["payments"]) == 1

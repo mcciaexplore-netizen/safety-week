@@ -35,20 +35,20 @@ def actions(entity_id):
 # ---------------- versions ----------------
 
 def test_versions_are_ordered_complete_and_immutable(client, people, prods):
-    h, admin = people["til"]["h"], people["til_admin"]["h"]
+    h, admin, sup = people["til"]["h"], people["til_admin"]["h"], people["super"]["h"]
     inv = client.post(f"{API}/invoices", json=body(prods, 1), headers=h).json()
     i = inv["id"]
     assert client.put(f"{API}/invoices/{i}", json=body(prods, 2, action="submit"), headers=h).status_code == 200
     for n, reason in ((3, "customer added stock"), (4, "typo in company"), (5, "discount agreed")):
         r = client.put(f"{API}/invoices/{i}", json=body(prods, n, action="submit", edit_reason=reason,
-                                                       company_name=f"Audit Co {n}"), headers=h)
+                                                       company_name=f"Audit Co {n}"), headers=sup)  # only the central admin revises
         assert r.status_code == 200 and r.json()["version"] == n - 1
 
     versions = client.get(f"{API}/invoices/{i}/versions", headers=admin).json()
     assert [v["version_number"] for v in versions] == [4, 3, 2, 1]                      # newest first, no gaps
     assert [v["edit_reason"] for v in versions] == ["discount agreed", "typo in company", "customer added stock", ""]
     assert [v["status"] for v in versions] == ["EDITED", "EDITED", "EDITED", "SUBMITTED"]
-    assert {v["edited_by_name"] for v in versions} == {"til"}
+    assert {v["edited_by_name"] for v in versions} == {"til", "super"}  # v1 submitted by the branch, the changes by the central admin
     stamps = [v["created_at"] for v in versions]
     assert stamps == sorted(stamps, reverse=True)
 
@@ -66,14 +66,14 @@ def test_versions_are_ordered_complete_and_immutable(client, people, prods):
 
 
 def test_a_reason_is_required_to_change_a_submitted_invoice(client, people, prods):
-    h = people["til"]["h"]
+    h, sup = people["til"]["h"], people["super"]["h"]
     inv = client.post(f"{API}/invoices", json=body(prods, action="submit"), headers=h).json()
     for reason in (None, "", "  ", "no"):
         extra = {} if reason is None else {"edit_reason": reason}
-        r = client.put(f"{API}/invoices/{inv['id']}", json=body(prods, 3, action="submit", **extra), headers=h)
+        r = client.put(f"{API}/invoices/{inv['id']}", json=body(prods, 3, action="submit", **extra), headers=sup)
         assert r.status_code == 422, reason
     assert client.get(f"{API}/invoices/{inv['id']}", headers=h).json()["version"] == 1   # nothing was applied
-    ok = client.put(f"{API}/invoices/{inv['id']}", json=body(prods, 3, action="submit", edit_reason="fix qty"), headers=h)
+    ok = client.put(f"{API}/invoices/{inv['id']}", json=body(prods, 3, action="submit", edit_reason="fix qty"), headers=sup)
     assert ok.status_code == 200 and ok.json()["version"] == 2
     # drafts need no reason
     d = client.post(f"{API}/invoices", json=body(prods), headers=h).json()
@@ -124,17 +124,17 @@ def test_cancel_keeps_the_record_and_records_why(client, people, prods):
 # ---------------- audit rows ----------------
 
 def test_invoice_lifecycle_writes_audit_rows(client, people, prods):
-    h, admin = people["til"]["h"], people["til_admin"]["h"]
+    h, admin, sup = people["til"]["h"], people["til_admin"]["h"], people["super"]["h"]
     inv = client.post(f"{API}/invoices", json=body(prods, 1), headers=h).json()
     i = inv["id"]
     client.put(f"{API}/invoices/{i}", json=body(prods, 2), headers=h)                                    # draft save
     client.put(f"{API}/invoices/{i}", json=body(prods, 3, action="submit"), headers=h)                   # submit
-    client.put(f"{API}/invoices/{i}", json=body(prods, 4, action="submit", edit_reason="qty"), headers=h)  # revise
+    client.put(f"{API}/invoices/{i}", json=body(prods, 4, action="submit", edit_reason="qty"), headers=sup)  # revise (central admin only)
     client.post(f"{API}/invoices/{i}/cancel", json={"reason": "customer withdrew"}, headers=admin)      # cancel
     rows = audit(i)
     assert [r["action"] for r in rows] == ["invoice.create", "invoice.update", "invoice.submit",
                                            "invoice.revise", "invoice.cancel"]
-    assert rows[0]["actor_name"] == "til" and rows[-1]["actor_name"] == "til_admin"
+    assert rows[0]["actor_name"] == "til" and rows[3]["actor_name"] == "super" and rows[-1]["actor_name"] == "til_admin"
     revise = rows[3]["metadata"]
     assert (revise["reason"], revise["version"], revise["invoice_number"]) == ("qty", 2, inv["invoice_number"])
     assert float(revise["previous_total"]) == 17.0 and float(revise["new_total"]) == 23.0               # 3 vs 4 badges

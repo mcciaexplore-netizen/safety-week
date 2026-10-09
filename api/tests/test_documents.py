@@ -78,7 +78,7 @@ def test_edit_creates_a_new_document_and_keeps_the_old_one(client, people, prods
     h = people["til"]["h"]
     inv = client.post(f"{API}/invoices", json=body(prods, [("Badges", 10)]), headers=h).json()
     revised = body(prods, [("Badges", 100)], company_name="Renamed Pdf Co", edit_reason="qty")
-    r = client.put(f"{API}/invoices/{inv['id']}", json=revised, headers=h)
+    r = client.put(f"{API}/invoices/{inv['id']}", json=revised, headers=people["super"]["h"])  # only the central admin revises
     assert r.status_code == 200 and (r.json()["status"], r.json()["version"]) == ("EDITED", 2)
 
     v1, v2 = docs(inv["id"])

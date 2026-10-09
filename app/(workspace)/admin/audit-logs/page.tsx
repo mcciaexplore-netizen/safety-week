@@ -11,6 +11,7 @@ import { API_MODE, services } from "@/lib/services";
 const GROUPS = [
   ["", "Everything"],
   ["invoice.", "Invoices"],
+  ["edit_request.", "Edit requests"],
   ["auth.", "Sign-ins"],
   ["user.", "Users and roles"],
   ["stock.", "Stock and transfers"],
@@ -24,6 +25,7 @@ function details(m: Record<string, unknown>): string {
   const parts: string[] = [];
   if (m.invoice_number) parts.push(`${m.invoice_number}${m.version ? ` v${m.version}` : ""}`);
   if (m.reason) parts.push(`reason: ${m.reason}`);
+  if (m.note && !m.from_branch) parts.push(`note: ${m.note}`);
   if (m.previous_total !== undefined) parts.push(`total ${m.previous_total} → ${m.new_total}`);
   if (m.changes && typeof m.changes === "object") {
     for (const [k, v] of Object.entries(m.changes as Record<string, { old: unknown; new: unknown }>))

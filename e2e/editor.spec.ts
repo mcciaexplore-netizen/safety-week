@@ -35,9 +35,14 @@ test("editor: a continuous form; the floating button previews the proforma; Subm
   await page.getByLabel("Address", { exact: true }).fill("Plot 5, Bhosari MIDC");
   await page.getByLabel("GSTIN", { exact: true }).fill("27AABCT1234A1Z5");
   await page.getByLabel("Email ID", { exact: true }).fill("accounts@test.example");
-  await page.getByLabel("Contact Person & Cell No — name").fill("A. Kulkarni");
-  await page.getByLabel("Contact Person & Cell No — cell no").fill("9800011111");
-  await page.getByLabel("Proforma Invoice Date").fill("2027-02-12");
+  await page.getByLabel("Contact Person Name").fill("A. Kulkarni");
+  await page.getByLabel("Mobile No").fill("9800011111");
+  // a new proforma is dated today and the date cannot be changed
+  const dateBox = page.getByLabel("Proforma Invoice Date");
+  const today = await dateBox.inputValue();
+  expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  await expect(dateBox).toHaveAttribute("readonly", "");
+  const shown = (() => { const d = new Date(`${today}T00:00:00Z`); return `${d.getUTCDate()}/${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}/${d.getUTCFullYear()}`; })();
 
   // amounts are computed as the quantity is typed
   await qty(page, "Ball Pens (Matt Finish)").fill("3");
@@ -57,7 +62,7 @@ test("editor: a continuous form; the floating button previews the proforma; Subm
   await expect(paper(page, "paper-gstin")).toHaveText("27AABCT1234A1Z5");
   await expect(paper(page, "paper-email")).toHaveText("accounts@test.example");
   await expect(paper(page, "paper-contact")).toContainText("A. Kulkarni 9800011111");
-  await expect(paper(page, "paper-date")).toHaveText("12/Feb/2027");
+  await expect(paper(page, "paper-date")).toHaveText(shown);
   await expect(paper(page, "paper-grand-total")).toHaveText("1,200.50");
   await expect(paper(page, "paper-rounded")).toHaveText("1,201.00");
   await expect(paper(page, "invoice-paper")).toContainText("Water Bottle"); // every item is listed
@@ -88,7 +93,7 @@ test("editor: a continuous form; the floating button previews the proforma; Subm
   await expect(page.getByText("Test Industries Pvt. Ltd.")).toBeVisible();
   await page.goto(url);
   await expect(company(page)).toHaveValue("Test Industries Pvt. Ltd.");
-  await expect(page.getByLabel("Proforma Invoice Date")).toHaveValue("2027-02-12");
+  await expect(page.getByLabel("Proforma Invoice Date")).toHaveValue(today);
   await expect(qty(page, "Ball Pens (Matt Finish)")).toHaveValue("10");
   await expect(page.getByTestId("save-state")).toContainText("All changes saved");
 

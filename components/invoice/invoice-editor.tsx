@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { useAsync } from "@/hooks/use-async";
 import { useSession } from "@/hooks/use-session";
 import { emptyDraft, invoiceToDraft, type InvoiceDraft } from "@/lib/invoice/model";
-import { services } from "@/lib/services";
+import { API_MODE, services } from "@/lib/services";
 import type { Product } from "@/lib/types";
 import { InvoiceWorkspace } from "./invoice-workspace";
 
@@ -56,6 +56,23 @@ export function InvoiceEditor({ id }: { id?: string }) {
     return (
       <div className="mx-auto max-w-[1600px] space-y-3" role="status" aria-label="Loading editor">
         <LoadingRows rows={8} />
+      </div>
+    );
+  }
+  // a submitted invoice can only be changed by the central admin; everyone else is sent to ask
+  const status = loaded.data.draft.status;
+  if (id && API_MODE && session && session.user.role !== "SUPER_ADMIN" && status !== null && status !== "DRAFT") {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <ErrorState
+          title="Only the central admin can edit this invoice"
+          message="A submitted invoice can only be changed by the central admin. Open the invoice and choose “Request edit” to ask for the change."
+          action={
+            <Link href={`/invoices/${id}`} className={buttonVariants({ variant: "outline" })}>
+              Open the invoice
+            </Link>
+          }
+        />
       </div>
     );
   }

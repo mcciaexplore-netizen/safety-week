@@ -224,10 +224,12 @@ def update_invoice(s: Session, p: Principal, invoice_id: uuid.UUID, data: Invoic
     invoice = get_invoice(s, p, invoice_id)  # 404 for anything outside the caller's branch
     if invoice.status == "CANCELLED":
         raise Conflict("Cancelled invoices cannot be edited")
+    was_draft = invoice.status == "DRAFT"
+    if not was_draft and not p.is_super:  # branch users AND branch admins ask; only the central admin changes a submitted invoice
+        raise Forbidden("Only the central admin can change a submitted invoice. Use “Request edit” to ask for the change.")
     event = s.get(repo.Event, invoice.event_id)
     items, totals = _calculate(s, p, data, event)
 
-    was_draft = invoice.status == "DRAFT"
     if not (was_draft and data.action != "submit"):  # a submitted invoice or a revision: stock must cover it
         _check_stock(s, s.get(repo.Branch, invoice.branch_id), event, items,
                      None if was_draft else {i.product_id: i.quantity for i in invoice.items})
@@ -258,6 +260,9 @@ def update_invoice(s: Session, p: Principal, invoice_id: uuid.UUID, data: Invoic
         _snapshot(s, p, invoice, "" if was_draft else reason)
     _audit(s, p, invoice, action, previous_total=str(previous_total), new_total=str(invoice.grand_total),
            **({} if was_draft else {"reason": reason}))
+    if not was_draft:  # the central admin has made the change: any open request for it is answered
+        from .edit_requests import close_open_requests
+        close_open_requests(s, p, invoice)
     return invoice
 
 

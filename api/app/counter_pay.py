@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import razorpay, services
+from .config import settings
 from .auth import Principal, current_principal
 from .db import SessionLocal, get_session
 from .models import Invoice, InvoicePayment
@@ -57,7 +58,8 @@ def verify_reference(s: Session, reference: str, amount: Decimal, exclude_invoic
 
 @router.get("/config")
 def config(p: Me):
-    return {"razorpay": razorpay.enabled()}
+    # test keys make QR codes that no UPI app can pay (Razorpay only lets live-mode QR codes be scanned): the screen warns about it
+    return {"razorpay": razorpay.enabled(), "test_mode": razorpay.enabled() and settings.razorpay_key_id.startswith("rzp_test_")}
 
 
 class QrIn(BaseModel):

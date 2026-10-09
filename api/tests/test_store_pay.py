@@ -228,7 +228,7 @@ def staff_invoice(client, people, prods, who, qty, **extra):
 
 def test_counter_qr_is_created_for_the_exact_amount_and_reports_paid(client, people, prods, rz):
     h = people["til"]["h"]
-    assert client.get(f"{API}/payments/config", headers=h).json() == {"razorpay": True}
+    assert client.get(f"{API}/payments/config", headers=h).json()["razorpay"] is True
     r = client.post(f"{API}/payments/razorpay-qr", headers=h, json={"amount": "94.40", "note": "Counter Co"})
     assert r.status_code == 200
     qr = r.json()
@@ -268,7 +268,7 @@ def test_a_razorpay_payment_on_an_invoice_must_be_real(client, people, prods, rz
     assert again.status_code == 422 and "already recorded" in again.json()["detail"]
     # revising the invoice keeps its own payment without asking Razorpay again for a new one
     inv = ok.json()
-    rev = client.put(f"{API}/invoices/{inv['id']}", headers=h, json={"company_name": "Counter Co", "invoice_date": "2027-03-03", "action": "submit", "edit_reason": "name",
+    rev = client.put(f"{API}/invoices/{inv['id']}", headers=people["super"]["h"], json={"company_name": "Counter Co", "invoice_date": "2027-03-03", "action": "submit", "edit_reason": "name",
                                                                       "items": [{"product_id": prods["Slogans - 10 x 15"], "quantity": 1}], "payments": pay(pid)})
     assert rev.status_code == 200
     # cash is never checked with Razorpay

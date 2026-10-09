@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, Printer } from "lucide-react";
 import { DownloadButton } from "@/components/app/download-button";
 import { InvoiceAdminPanel } from "@/components/app/invoice-admin-panel";
 import { PageHeader } from "@/components/app/page-header";
+import { RequestEditButton, useOpenEditRequests } from "@/components/app/request-edit";
 import { ErrorState, LoadingRows } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { InvoicePaper, PaperFrame } from "@/components/invoice/invoice-paper";
@@ -26,6 +27,9 @@ export function InvoiceDetailView({ id }: { id: string }) {
   }, `invoice:${session?.branch.id}:${id}`);
   const inv = data.data?.invoice;
   const isAdmin = API_MODE && !!session && session.user.role !== "BRANCH_USER";
+  // a draft can be continued by its branch; once submitted, ONLY the central admin edits - everyone else sends a request
+  const requests = useOpenEditRequests();
+  const central = !API_MODE || session?.user.role === "SUPER_ADMIN";
 
   // ?print=1 (the history "Download" action) opens the browser print dialog: Save as PDF.
   useEffect(() => {
@@ -70,12 +74,19 @@ export function InvoiceDetailView({ id }: { id: string }) {
                     Print
                   </Button>
                   <DownloadButton invoice={inv} label="Download PDF" disabled={inv.status === "DRAFT" && API_MODE} />
-                  {inv.status !== "CANCELLED" && (
+                  {inv.status !== "CANCELLED" && (central || inv.status === "DRAFT" ? (
                     <Link href={`/invoices/${inv.id}/edit`} className={buttonVariants()}>
                       <Pencil data-icon="inline-start" />
                       Edit
                     </Link>
-                  )}
+                  ) : (
+                    <RequestEditButton
+                      invoiceId={inv.id}
+                      invoiceNumber={inv.invoiceNumber}
+                      pending={!!requests.data?.some((r) => r.invoice_id === inv.id)}
+                      onSent={requests.reload}
+                    />
+                  ))}
                 </>
               }
             />

@@ -59,7 +59,7 @@ def test_draft_lifecycle_and_server_side_totals(client, people, prods):
     # revise a submitted invoice -> EDITED, version 2; v1 snapshot is untouched
     rev = {**upd, "action": "submit", "items": [{"product_id": prods["Badges"]["id"], "quantity": 1}],
            "edit_reason": "customer reduced order"}
-    r = client.put(f"{API}/invoices/{inv['id']}", json=rev, headers=h)
+    r = client.put(f"{API}/invoices/{inv['id']}", json=rev, headers=people["super"]["h"])  # only the central admin revises
     assert r.status_code == 200 and (r.json()["status"], r.json()["version"]) == ("EDITED", 2)
     v = versions(inv["id"])
     assert [x[0] for x in v] == [1, 2] and v[1][1] == "customer reduced order"

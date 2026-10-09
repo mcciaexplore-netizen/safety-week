@@ -11,7 +11,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import admin, counter_pay, documents, exports, login, stock, store, store_orders, store_pay
+from . import admin, counter_pay, documents, edit_requests, exports, login, stock, store, store_orders, store_pay
 from . import repositories as repo
 from . import services
 from .auth import Principal, current_principal
@@ -259,6 +259,7 @@ def invoice_header(s: Session = Depends(get_session)):
 app.include_router(v1)
 app.include_router(admin.router)
 app.include_router(stock.router)
+app.include_router(edit_requests.router)
 app.include_router(login.router)
 app.include_router(store.router)
 app.include_router(store_pay.router)

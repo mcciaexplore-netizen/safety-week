@@ -33,7 +33,6 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await page.goto("/invoices/new");
   await inPreview(page, () => expect(page.getByTestId("paper-invoice-no")).toHaveText(/^NSW27-TIL-\d{6}$/));
   await company(page).fill(name);
-  await page.getByLabel("Proforma Invoice Date").fill("2027-02-12");
   const matt = page.getByLabel("Quantity for Ball Pens (Matt Finish)", { exact: true });
   await expect(page.getByTestId("qty-input")).toHaveCount(39); // the whole catalogue is on the sheet
   await matt.fill("3");
@@ -86,15 +85,36 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await expect(page.getByText(/^(Submitted|PDF generated)$/).first()).toBeVisible();
   await expect(page.getByTestId("paper-grand-total")).toHaveText("123.90");
 
-  // revise -> Edited, version 2
-  await page.getByRole("link", { name: "Edit", exact: true }).click();
-  await matt.fill("10");
-  await page.getByRole("button", { name: "Save revision" }).click();
-  await expect(page.getByTestId("error-editReason")).toHaveText("Give a reason for the change"); // no reason, no revision
-  await page.getByLabel("Reason for this change").fill("customer raised the quantity");
-  await page.getByRole("button", { name: "Save revision" }).click();
-  await confirmSubmit(page);
-  await expect(page.getByText("Revision saved")).toBeVisible();
+  // a branch user cannot edit a submitted invoice: no Edit button, only "Request edit"; the edit page refuses too
+  await expect(page.getByRole("link", { name: "Edit", exact: true })).toHaveCount(0);
+  const viewUrl = page.url();
+  await page.getByTestId("request-edit").click();
+  await page.getByLabel("What needs to change").fill("customer raised the quantity");
+  await page.getByTestId("send-edit-request").click();
+  await expect(page.getByTestId("edit-requested")).toBeVisible();
+  await page.goto(`${viewUrl}/edit`);
+  await expect(page.getByText("Only the central admin can edit this invoice")).toBeVisible();
+
+  // the central admin sees the request and makes the change -> Edited, version 2 (the request is answered by that)
+  const central = await (await browser.newContext()).newPage();
+  await central.goto("/select-branch");
+  await central.getByRole("link", { name: "Central admin sign-in" }).click();
+  await central.getByLabel("User ID / e-mail").fill("admin@example.invalid");
+  await central.getByRole("button", { name: "Sign in" }).click();
+  await expect(central).toHaveURL(/\/admin$/);
+  await central.goto("/edit-requests");
+  const waiting = central.getByTestId("edit-request-row").filter({ hasText: number });
+  await expect(waiting).toContainText("customer raised the quantity");
+  await waiting.getByTestId("open-to-edit").click();
+  await central.getByLabel("Quantity for Ball Pens (Matt Finish)", { exact: true }).fill("10");
+  await central.getByRole("button", { name: "Save revision" }).click();
+  await expect(central.getByTestId("error-editReason")).toHaveText("Give a reason for the change"); // no reason, no revision
+  await central.getByLabel("Reason for this change").fill("customer raised the quantity");
+  await central.getByRole("button", { name: "Save revision" }).click();
+  await confirmSubmit(central);
+  await expect(central.getByText("Revision saved")).toBeVisible();
+  await central.goto("/edit-requests?x=1");
+  await expect(central.getByText("No requests waiting")).toBeVisible();                              // answered by the change
   await page.goto("/invoices");
   await page.getByLabel("Search invoices").fill(number);
   const row = page.getByRole("row").filter({ hasText: number });
@@ -140,7 +160,7 @@ test("real backend: draft -> reopen -> submit -> revise; branch scoping; wrong-b
   await expect(rows).toHaveCount(2); // v2 (revision) above v1 (original)
   await expect(rows.nth(0)).toContainText("v2");
   await expect(rows.nth(0)).toContainText("customer raised the quantity");
-  await expect(rows.nth(0)).toContainText("Rajesh Patil");
+  await expect(rows.nth(0)).toContainText("Central Admin");
   await expect(rows.nth(1)).toContainText("v1");
   await admin.getByRole("button", { name: "View version 1" }).click(); // the old version, exactly as it was
   await expect(admin.getByText("Version 1 — as it was then")).toBeVisible();

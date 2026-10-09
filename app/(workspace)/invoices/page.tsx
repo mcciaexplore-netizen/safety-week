@@ -6,6 +6,7 @@ import { Eye, FilePlus2, Pencil, Search } from "lucide-react";
 import { DownloadButton } from "@/components/app/download-button";
 import { DailyExcel } from "@/components/app/daily-excel";
 import { PageHeader } from "@/components/app/page-header";
+import { RequestEditButton, useOpenEditRequests } from "@/components/app/request-edit";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/app/states";
 import { PaymentBadge, StatusBadge, STATUS_LABEL } from "@/components/app/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export default function InvoicesPage() {
     () => services.invoices.list({ query, status, from, to }),
     `inv:${session?.branch.id}:${query}:${status}:${from}:${to}`,
   );
+  const requests = useOpenEditRequests();
   const filtered = query !== "" || status !== "ALL" || from !== "" || to !== "";
 
   return (
@@ -46,7 +48,7 @@ export default function InvoicesPage() {
       <PageHeader
         eyebrow={session ? `${session.branch.name} branch` : undefined}
         title="Invoice history"
-        description="Search by invoice ID or customer. Open, revise or download any invoice."
+        description="Search by invoice ID or customer. Open or download any invoice. To change a submitted invoice, send an edit request to the central admin."
         actions={
           <Link href="/invoices/new" className={buttonVariants()}>
             <FilePlus2 data-icon="inline-start" />
@@ -164,13 +166,24 @@ export default function InvoicesPage() {
                       >
                         <Eye />
                       </Link>
-                      <Link
-                        href={`/invoices/${inv.id}/edit`}
-                        className={buttonVariants({ variant: "outline", size: "icon-sm" })}
-                        aria-label={`Edit ${inv.invoiceNumber}`}
-                      >
-                        <Pencil />
-                      </Link>
+                      {!API_MODE || inv.status === "DRAFT" ? (
+                        <Link
+                          href={`/invoices/${inv.id}/edit`}
+                          className={buttonVariants({ variant: "outline", size: "icon-sm" })}
+                          aria-label={`Edit ${inv.invoiceNumber}`}
+                        >
+                          <Pencil />
+                        </Link>
+                      ) : inv.status !== "CANCELLED" ? (
+                        // submitted invoices: only the central admin edits, so the branch asks
+                        <RequestEditButton
+                          compact
+                          invoiceId={inv.id}
+                          invoiceNumber={inv.invoiceNumber}
+                          pending={!!requests.data?.some((r) => r.invoice_id === inv.id)}
+                          onSent={requests.reload}
+                        />
+                      ) : null}
                       <DownloadButton invoice={inv} disabled={inv.status === "DRAFT" && API_MODE} />
                     </div>
                   </TableCell>

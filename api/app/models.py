@@ -261,6 +261,29 @@ class InvoiceVersion(Base):
     created_at: Mapped[datetime] = created()
 
 
+class EditRequest(Base):
+    """A branch asks the central admin to change a submitted invoice; only the central admin can edit one."""
+
+    __tablename__ = "edit_requests"
+    __table_args__ = (
+        CheckConstraint("status IN ('OPEN', 'DONE', 'DECLINED')", name="ck_edit_requests_status"),
+        Index("ix_edit_requests_invoice", "invoice_id"),
+        Index("ix_edit_requests_status", "status", "created_at"),
+        Index("uq_edit_requests_open", "invoice_id", unique=True, postgresql_where=text("status = 'OPEN'")),  # one open request per invoice
+    )
+    id: Mapped[uuid.UUID] = pk()
+    invoice_id: Mapped[uuid.UUID] = fk("invoices.id", ondelete="CASCADE")
+    branch_id: Mapped[uuid.UUID] = fk("branches.id")
+    requested_by: Mapped[uuid.UUID | None] = fk("users.id", nullable=True)
+    requested_by_name: Mapped[str] = mapped_column(String(200), server_default="")  # snapshot
+    reason: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), server_default="OPEN")  # OPEN | DONE | DECLINED
+    resolved_by_name: Mapped[str] = mapped_column(String(200), server_default="")
+    resolved_note: Mapped[str] = mapped_column(Text, server_default="")
+    created_at: Mapped[datetime] = created()
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class InvoiceDocument(Base):
     __tablename__ = "invoice_documents"
     __table_args__ = (UniqueConstraint("version_id"),)  # one PDF per invoice version

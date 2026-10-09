@@ -132,14 +132,14 @@ export function InvoiceForm({
               aria-invalid={!!errors["customer.email"]}
             />
           </Field>
-          <Field label={`${LABELS.contact} — name`} htmlFor="contactPerson">
+          <Field label="Contact Person Name" htmlFor="contactPerson">
             <Input
               id="contactPerson"
               value={draft.customer.contactPerson}
               onChange={(e) => setCustomer("contactPerson", e.target.value)}
             />
           </Field>
-          <Field label={`${LABELS.contact} — cell no`} htmlFor="contactPhone">
+          <Field label="Mobile No" htmlFor="contactPhone">
             <Input
               id="contactPhone"
               inputMode="tel"
@@ -165,9 +165,13 @@ export function InvoiceForm({
               id="invoiceDate"
               type="date"
               value={draft.invoiceDate}
+              // a new proforma is always dated today (set when the form opens); only an existing invoice can change its date
+              readOnly={!draft.id}
+              className={!draft.id ? "bg-muted" : undefined}
               onChange={(e) => update((d) => ({ ...d, invoiceDate: e.target.value }))}
               aria-invalid={!!errors["invoiceDate"]}
             />
+            {!draft.id && <p className="text-xs text-muted-foreground">Today&apos;s date — fixed for a new invoice.</p>}
           </Field>
           {draft.status && draft.status !== "DRAFT" && (
             <Field

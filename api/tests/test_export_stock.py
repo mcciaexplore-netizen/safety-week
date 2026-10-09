@@ -149,7 +149,7 @@ def test_stock_remaining_is_opening_minus_invoiced_and_flags_low(client, people,
     assert low["configured"] == 2 and low["low_count"] == 2
     revised = {"company_name": "Stock Co", "invoice_date": DAY, "action": "submit", "edit_reason": "smaller order",
                "items": [{"product_id": prods["Badges"], "quantity": 10}]}
-    assert client.put(f"{API}/invoices/{inv['id']}", json=revised, headers=h).status_code == 200
+    assert client.put(f"{API}/invoices/{inv['id']}", json=revised, headers=people["super"]["h"]).status_code == 200
     assert q()["Badges"]["remaining"] == 75                                                  # 100 - 10 - 15
     client.post(f"{API}/invoices/{inv['id']}/cancel", json={"reason": "withdrawn"}, headers=people["super"]["h"])
     assert q()["Badges"]["remaining"] == 85                                                  # 100 - 15
@@ -253,7 +253,7 @@ def test_a_submitted_invoice_cannot_take_more_than_the_branch_has(client, people
     ok = client.post(f"{API}/invoices", headers=h, json=body(8)).json()
     assert client.post(f"{API}/invoices", headers=h, json=body(3)).status_code == 422                        # only 2 left now
     # a revision may keep its own quantity but not exceed what is left plus that quantity
-    rev = lambda q: client.put(f"{API}/invoices/{ok['id']}", headers=h, json=body(q, edit_reason="change"))
+    rev = lambda q: client.put(f"{API}/invoices/{ok['id']}", headers=people["super"]["h"], json=body(q, edit_reason="change"))
     assert rev(10).status_code == 200                                                                          # 2 left + its own 8
     assert rev(11).status_code == 422
     # a branch with no stock set up is not limited
