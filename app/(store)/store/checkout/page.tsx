@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Banknote, CreditCard, Loader2, MapPin } from "lucide-react";
+import { CreditCard, Loader2, MapPin } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,6 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [method, setMethod] = useState<"PAY_AT_PICKUP" | "ONLINE">("PAY_AT_PICKUP");
   const [problem, setProblem] = useState<{ message: string; short?: StoreError["short"] } | null>(null);
 
   if (error) return <div className="mx-auto max-w-3xl px-4 py-16"><ErrorState message={error} onRetry={reload} /></div>;
@@ -41,7 +40,7 @@ export default function CheckoutPage() {
   const emailV = email ?? customer?.email ?? "";
   const phoneV = phone ?? customer?.phone ?? "";
 
-  const online = method === "ONLINE" && data.online_payments;
+  const online = !!data.online_payments;
 
   async function place(e: FormEvent) {
     e.preventDefault();
@@ -111,25 +110,16 @@ export default function CheckoutPage() {
 
           <section className="glass space-y-4 rounded-xl p-5 sm:p-6">
             <h2 className="text-lg">3. How will you pay?</h2>
-            <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
-              <label className={`flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition-all duration-200 ${method === "PAY_AT_PICKUP" ? "border-primary ring-[3px] ring-primary/10" : "hover:border-primary/40"}`}>
-                <input type="radio" name="pay" value="PAY_AT_PICKUP" checked={method === "PAY_AT_PICKUP"} onChange={() => setMethod("PAY_AT_PICKUP")} className="mt-1" />
-                <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><Banknote className="size-4 text-primary" />Pay at pick-up</span>
-                  <span className="block text-xs text-muted-foreground">Pay at the branch counter when you collect — by cash, or by UPI / card through Razorpay.</span></span>
-              </label>
-              {data.online_payments ? (
-                <label className={`flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition-all duration-200 ${method === "ONLINE" ? "border-primary ring-[3px] ring-primary/10" : "hover:border-primary/40"}`}>
-                  <input type="radio" name="pay" value="ONLINE" checked={method === "ONLINE"} onChange={() => setMethod("ONLINE")} className="mt-1" data-testid="pay-online" />
-                  <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4 text-primary" />Pay online with Razorpay</span>
-                    <span className="block text-xs text-muted-foreground">UPI, cards and net banking in Razorpay&apos;s secure window — pay now and just collect.</span></span>
-                </label>
-              ) : (
-                <label className="flex gap-3 rounded-xl border border-dashed bg-muted/50 p-4 opacity-70">
-                  <input type="radio" name="pay" disabled className="mt-1" />
-                  <span className="text-sm"><span className="flex items-center gap-1 font-heading font-bold"><CreditCard className="size-4" />Pay online with Razorpay <span className="rounded-full bg-primary/10 px-2 text-[0.65rem] font-bold uppercase text-primary">Coming soon</span></span>
-                    <span className="block text-xs text-muted-foreground">UPI, cards and net banking — pay now and just collect.</span></span>
-                </label>
-              )}
+            {/* one way to pay: online through Razorpay, then collect. (Without Razorpay keys, i.e. development only, orders fall back to pay-at-pick-up.) */}
+            <div className="flex gap-3 rounded-xl border border-primary bg-white/70 p-4 ring-[3px] ring-primary/10" data-testid="pay-online">
+              <CreditCard className="mt-0.5 size-5 shrink-0 text-primary" />
+              <div className="text-sm">
+                <p className="font-heading font-bold">{online ? "Pay online and pick up" : "Pay at pick-up"}</p>
+                <p className="mt-0.5 font-medium">{online ? "Pay with Razorpay" : "Pay at the branch counter when you collect"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {online ? "UPI, cards and net banking in Razorpay's secure window. Once paid, your invoice is e-mailed and your order is packed for you to collect." : "Online payment is not set up on this server."}
+                </p>
+              </div>
             </div>
           </section>
         </div>
