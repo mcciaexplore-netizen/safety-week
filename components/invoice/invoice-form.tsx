@@ -139,10 +139,12 @@ export function InvoiceForm({
               onChange={(e) => setCustomer("contactPerson", e.target.value)}
             />
           </Field>
-          <Field label="Mobile No" htmlFor="contactPhone">
+          <Field label="Mobile No *" htmlFor="contactPhone" error={errors["customer.contactPhone"]}>
             <Input
               id="contactPhone"
               inputMode="tel"
+              required
+              aria-invalid={!!errors["customer.contactPhone"]}
               value={draft.customer.contactPhone}
               onChange={(e) => setCustomer("contactPhone", e.target.value)}
             />

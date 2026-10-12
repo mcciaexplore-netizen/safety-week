@@ -21,6 +21,13 @@ const draftSchema = z.object({
 });
 
 const submitSchema = draftSchema.extend({
+  customer: customer.extend({
+    contactPhone: z
+      .string()
+      .trim()
+      .min(1, "Mobile number is required")
+      .refine((v) => v.replace(/\D/g, "").length >= 10 && /^[0-9+\s-]+$/.test(v), "Enter a valid mobile number (at least 10 digits)"),
+  }),
   invoiceDate: z.string().min(1, "Invoice date is required"),
   items: z
     .array(

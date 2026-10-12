@@ -5,12 +5,13 @@ and every amount. The server derives the branch from the authenticated identity
 (PLAN 26.11), allocates the number, and recalculates all totals itself (PLAN 11).
 """
 
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class Out(BaseModel):
@@ -98,6 +99,13 @@ class InvoiceCreate(BaseModel):
     payment_details: str = ""  # free-text notes, printed after the structured payments
     payments: list[PaymentIn] = Field(default_factory=list, max_length=6)
     action: Literal["draft", "submit"] = "draft"
+
+    @model_validator(mode="after")
+    def _mobile_required_on_submit(self):
+        phone = self.contact_phone.strip()
+        if self.action == "submit" and (len(re.sub(r"\D", "", phone)) < 10 or not re.fullmatch(r"[0-9+\s-]+", phone)):
+            raise ValueError("Enter the customer's mobile number (at least 10 digits)")
+        return self
 
 
 class InvoiceUpdate(InvoiceCreate):

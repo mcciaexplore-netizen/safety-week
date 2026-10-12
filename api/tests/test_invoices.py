@@ -173,3 +173,14 @@ def test_history_search_filters_and_scoping(client, people, prods):
 
 def test_dev_token_endpoint_is_off_by_default(client):
     assert client.post(f"{API}/dev/token", json={"email": "sbr@x.invalid"}).status_code == 404
+
+
+def test_submit_needs_a_customer_mobile_number(client, people, prods):
+    h = people["til"]["h"]
+    for phone in ("", "12345", "abcdefghij"):
+        r = client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "action": "submit", "contact_phone": phone}, headers=h)
+        assert r.status_code == 422, phone
+    # a draft may still be saved without one, and a valid number is accepted on submit
+    assert client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "contact_phone": ""}, headers=h).status_code == 201
+    ok = client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "action": "submit", "contact_phone": "+91 98765 43210"}, headers=h)
+    assert ok.status_code == 201

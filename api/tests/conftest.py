@@ -51,7 +51,16 @@ def client():
 
     from app.main import app
 
-    return TestClient(app)
+    class PhoneDefaultingClient(TestClient):
+        """Submitted invoices need a customer mobile number; give test payloads one unless they set it themselves."""
+
+        def request(self, method, url, **kw):
+            j = kw.get("json")
+            if isinstance(j, dict) and "company_name" in j and "contact_phone" not in j:
+                kw["json"] = {**j, "contact_phone": "9876543210"}
+            return super().request(method, url, **kw)
+
+    return PhoneDefaultingClient(app)
 
 
 # ---- identities: real profile rows + tokens minted exactly the way the API signs them at sign-in ----
