@@ -51,6 +51,10 @@ def create_order(amount_paise: int, receipt: str, notes: dict | None = None) -> 
     return _call("POST", "/orders", json={"amount": amount_paise, "currency": "INR", "receipt": receipt[:40], "notes": notes or {}})
 
 
+def fetch_order(order_id: str) -> dict:
+    return _call("GET", f"/orders/{order_id}")
+
+
 def fetch_payment(payment_id: str) -> dict:
     return _call("GET", f"/payments/{payment_id}")
 

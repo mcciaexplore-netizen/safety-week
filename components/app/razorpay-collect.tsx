@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Loader2, QrCode, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAsync } from "@/hooks/use-async";
 import { formatRupees } from "@/lib/format";
 import { API_MODE } from "@/lib/services";
 import { api } from "@/lib/services/api";
+import { loadScript } from "@/lib/store/razorpay";
 
 /** Is Razorpay set up on the server? (If not, the reference box stays a plain typed field, as in development.) */
 export function useRazorpayEnabled(): boolean {
@@ -14,114 +15,89 @@ export function useRazorpayEnabled(): boolean {
   return !!cfg.data?.razorpay;
 }
 
-/** Razorpay setup on the server: `test` = test keys, whose QR codes no UPI app can pay (live keys are needed for that). */
+/** Razorpay setup on the server: `test` = test keys (test payments only, no real money moves). */
 export function useRazorpayConfig(): { enabled: boolean; test: boolean } {
   const cfg = useAsync(() => (API_MODE ? api<{ razorpay: boolean; test_mode?: boolean }>("/payments/config") : Promise.resolve(null)), "razorpay-config");
   return { enabled: !!cfg.data?.razorpay, test: !!cfg.data?.test_mode };
 }
 
-interface Qr { id: string; image_url: string | null; amount: string }
+interface CounterOrder { order_id: string; key_id: string; amount: number; currency: string }
+interface RazorpayReply { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }
 
 /**
- * Collect a payment at the counter through Razorpay UPI: shows a QR for the exact amount, waits (polls) until Razorpay
- * says the money arrived, then hands back the Razorpay payment id. The invoice only accepts a payment Razorpay confirms.
+ * Collect a payment at the counter through Razorpay's own payment window (the same one the store uses): the customer pays by
+ * UPI or card there, our server then asks Razorpay whether the money really arrived, and hands back the Razorpay payment id.
+ * The invoice only accepts a payment Razorpay confirms.
  */
 export function RazorpayCollect({ amount, paidId, onPaid }: { amount: number; paidId?: string; onPaid: (paymentId: string) => void }) {
-  const [qr, setQr] = useState<Qr | null>(null);
-  const [state, setState] = useState<"idle" | "creating" | "waiting" | "paid" | "closed">("idle");
+  const [state, setState] = useState<"idle" | "starting" | "paying" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [checkError, setCheckError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [paidAmount, setPaidAmount] = useState<number | null>(null);
   const { test } = useRazorpayConfig();
-  const onPaidRef = useRef(onPaid);
-  useEffect(() => { onPaidRef.current = onPaid; }, [onPaid]);
 
-  const stale = !!qr && state !== "paid" && Number(qr.amount) !== Math.round(amount * 100) / 100;
+  const stale = state === "paid" && paidAmount !== null && paidAmount !== Math.round(amount * 100) / 100;
 
-  async function create() {
+  async function start() {
     setError(null);
-    setState("creating");
+    setState("starting");
     try {
-      const made = await api<Qr>("/payments/razorpay-qr", { method: "POST", body: JSON.stringify({ amount: amount.toFixed(2) }) });
-      setQr(made);
-      setState("waiting");
+      const [order] = await Promise.all([
+        api<CounterOrder>("/payments/counter-order", { method: "POST", body: JSON.stringify({ amount: amount.toFixed(2) }) }),
+        loadScript(),
+      ]);
+      setState("paying");
+      const rz = new window.Razorpay!({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: "MCCIA",
+        description: "Counter payment",
+        theme: { color: "#003F8A" },
+        method: { upi: true, card: true, netbanking: true, wallet: false, emi: false, paylater: false },
+        modal: { ondismiss: () => setState((st) => (st === "paying" ? "idle" : st)) },
+        handler: async (reply: RazorpayReply) => {
+          try {
+            const r = await api<{ status: "paid"; payment_id: string; amount: string }>("/payments/counter-order/verify", { method: "POST", body: JSON.stringify(reply) });
+            setPaidAmount(Number(r.amount));
+            setState("paid");
+            onPaid(r.payment_id);
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Could not confirm the payment. If money was taken, do not charge again: check the Razorpay dashboard.");
+            setState("idle");
+          }
+        },
+      });
+      rz.open();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create the QR.");
+      setError(e instanceof Error ? e.message : "Could not start the payment.");
       setState("idle");
     }
   }
 
-  // ask Razorpay right away, then every 3 seconds, until the customer has paid
-  const check = useRef<() => Promise<void>>(async () => {});
-  useEffect(() => {
-    if (!qr || state !== "waiting") return;
-    let live = true;
-    const tick = async () => {
-      try {
-        const r = await api<{ status: "waiting" | "paid" | "closed"; payment_id?: string }>(`/payments/razorpay-qr/${qr.id}`);
-        if (!live) return;
-        setCheckError(null);
-        if (r.status === "paid" && r.payment_id) { setState("paid"); onPaidRef.current(r.payment_id); }
-        else if (r.status === "closed") setState("closed");
-      } catch (e) {
-        // the next check tries again, but say what went wrong instead of waiting silently
-        if (live) setCheckError(e instanceof Error ? e.message : "Could not check the payment.");
-      }
-    };
-    check.current = tick;
-    void tick();
-    const timer = window.setInterval(tick, 3000);
-    return () => { live = false; window.clearInterval(timer); };
-  }, [qr, state]);
-
-  if (paidId && /^pay_/.test(paidId) && (state === "paid" || !qr))
+  if (paidId && /^pay_/.test(paidId) && !stale)
     return (
       <div role="status" data-testid="razorpay-paid" className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success-fg">
         <CheckCircle2 className="size-5 shrink-0" />
-        <span><strong>Paid via Razorpay UPI</strong> — {formatRupees(amount)} received <span className="font-mono text-xs">({paidId})</span></span>
+        <span><strong>Paid via Razorpay</strong> — {formatRupees(amount)} received <span className="font-mono text-xs">({paidId})</span></span>
       </div>
     );
 
   return (
     <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 text-sm" data-testid="razorpay-collect">
-      {!qr || stale || state === "closed" ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" onClick={create} disabled={amount <= 0 || state === "creating"} data-testid="show-qr">
-            {state === "creating" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : stale || state === "closed" ? <RefreshCw data-icon="inline-start" /> : <QrCode data-icon="inline-start" />}
-            {stale || state === "closed" ? `Create a new QR for ${formatRupees(amount)}` : `Show UPI QR for ${formatRupees(amount)}`}
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {stale ? "The amount changed, so the earlier QR no longer matches." : state === "closed" ? "That QR has expired." : "The customer scans it with any UPI app. This screen shows “Paid” as soon as Razorpay confirms it."}
-          </span>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3 py-2 text-center">
-          <div className="space-y-1">
-            <p className="font-heading text-2xl font-bold">{formatRupees(Number(qr.amount))}</p>
-            <p className="text-muted-foreground">Ask the customer to scan this with any UPI app.</p>
-            <p className="flex items-center justify-center gap-2 font-medium text-primary"><Loader2 className="size-4 animate-spin" />Waiting for payment…</p>
-            {test && (
-              <p role="alert" data-testid="razorpay-test-mode" className="mx-auto max-w-md rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs text-warning">
-                Razorpay is in <strong>TEST mode</strong>: a test QR cannot be paid from a real UPI app, so it will keep waiting. Real payments need the live Razorpay keys.
-              </p>
-            )}
-            {checkError && <p role="alert" className="text-xs text-danger">Could not check with Razorpay: {checkError} (trying again…)</p>}
-          </div>
-          {qr.image_url ? (
-            // Razorpay's QR card is tall with the code in the middle of it: centre it and make it as large as the screen allows
-            // so the code itself is big enough to scan from a phone; click opens it full size.
-            <a href={qr.image_url} target="_blank" rel="noreferrer" title="Open the QR full size" className="block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr.image_url} alt={`UPI QR for ${formatRupees(amount)}`} className="mx-auto h-[min(40rem,75vh)] w-auto max-w-full rounded-lg border bg-white object-contain shadow-sm" data-testid="qr-image" />
-            </a>
-          ) : <QrCode className="size-24 text-primary" />}
-          <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={checking} data-testid="check-payment" onClick={async () => { setChecking(true); await check.current(); setChecking(false); }}>
-              {checking ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}Check payment now
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => { setQr(null); setState("idle"); setCheckError(null); }}>Cancel QR</Button>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={start} disabled={amount <= 0 || state === "starting" || state === "paying"} data-testid="collect-payment">
+          {state === "starting" || state === "paying" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <CreditCard data-icon="inline-start" />}
+          {stale ? `Collect ${formatRupees(amount)} again` : `Collect ${formatRupees(amount)} (UPI / card)`}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {stale ? "The amount changed, so the earlier payment no longer matches." : "Opens Razorpay's payment window: the customer pays by UPI (scan or app) or card. This screen shows “Paid” once Razorpay confirms it."}
+        </span>
+      </div>
+      {test && (
+        <p role="alert" data-testid="razorpay-test-mode" className="mt-2 rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs text-warning">
+          Razorpay is in <strong>TEST mode</strong>: only test payments work and no real money moves. Real payments need the live Razorpay keys.
+        </p>
       )}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
     </div>

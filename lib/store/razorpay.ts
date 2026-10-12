@@ -11,7 +11,7 @@ declare global {
 
 let loading: Promise<void> | null = null;
 /** Loads Razorpay's own checkout script (once). Card / UPI details are typed into THEIR window, never ours. */
-function loadScript(): Promise<void> {
+export function loadScript(): Promise<void> {
   if (typeof window === "undefined") return Promise.reject(new Error("no window"));
   if (window.Razorpay) return Promise.resolve();
   loading ??= new Promise<void>((resolve, reject) => {

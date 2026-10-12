@@ -1,7 +1,8 @@
-"""Taking a payment at the branch counter through Razorpay (UPI QR).
+"""Taking a payment at the branch counter through Razorpay.
 
-Staff choose "Razorpay UPI" (the only alternative to cash). The screen asks for a QR for the exact amount, the customer
-scans it with any UPI app, and the screen shows "Paid" the moment Razorpay confirms it. The invoice can then only record that
+Staff choose "Razorpay UPI" (the only alternative to cash). The screen asks the server for a Razorpay order for the exact
+amount and opens Razorpay's own payment window (the same one the online store uses: the customer pays by UPI / card there).
+The server then checks Razorpay's signature and asks Razorpay itself whether the money arrived. The invoice can then only record that
 payment if Razorpay itself says the money arrived (right amount, captured) and the payment has not been used before -
 staff cannot type a made-up reference.
 """
@@ -72,6 +73,53 @@ def _branch_code(s: Session, p: Principal) -> str:
     from . import repositories as repo
 
     return "ALL" if p.is_super else s.get(repo.Branch, p.branch_id).code
+
+
+class CounterOrderIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    amount: Decimal = Field(gt=0, le=1_000_000, max_digits=10, decimal_places=2)
+    note: str = Field(default="", max_length=100)
+
+
+@router.post("/counter-order")
+def create_counter_order(body: CounterOrderIn, s: Sess, p: Me):
+    """A Razorpay order for exactly this amount; the screen opens Razorpay's payment window with it."""
+    if not razorpay.enabled():
+        raise HTTPException(409, "Razorpay is not set up on this server")
+    code = _branch_code(s, p)
+    try:
+        order = razorpay.create_order(razorpay.paise(body.amount), f"CTR-{code}-{int(time.time())}",
+                                      {"branch": code, "by": p.name[:40], "kind": "counter", "note": body.note.strip()[:100]})
+    except razorpay.RazorpayError as e:
+        raise HTTPException(502, f"Razorpay could not start the payment ({e})") from None
+    return {"order_id": order["id"], "key_id": settings.razorpay_key_id, "amount": razorpay.paise(body.amount), "currency": "INR"}
+
+
+class CounterVerifyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    razorpay_order_id: str = Field(min_length=5, max_length=40)
+    razorpay_payment_id: str = Field(min_length=5, max_length=40)
+    razorpay_signature: str = Field(min_length=10, max_length=200)
+
+
+@router.post("/counter-order/verify")
+def verify_counter_order(body: CounterVerifyIn, s: Sess, p: Me):
+    """After the customer pays in Razorpay's window: check its signature, then ask Razorpay whether this exact order was paid."""
+    if not razorpay.verify_signature(body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature):
+        raise HTTPException(400, "The payment could not be verified")
+    try:
+        order = razorpay.fetch_order(body.razorpay_order_id)
+        notes = order.get("notes") or {}
+        if notes.get("kind") != "counter" or (not p.is_super and notes.get("branch") != _branch_code(s, p)):
+            raise HTTPException(404, "Payment not found")
+        pay = razorpay.fetch_payment(body.razorpay_payment_id)
+        if pay.get("status") == "authorized":  # accounts that do not auto-capture
+            pay = razorpay.capture(body.razorpay_payment_id, int(order["amount"]))
+    except razorpay.RazorpayError as e:
+        raise HTTPException(502, f"Could not confirm the payment with Razorpay ({e})") from None
+    if pay.get("order_id") != body.razorpay_order_id or int(pay.get("amount", -1)) != int(order["amount"]) or pay.get("status") != "captured":
+        raise HTTPException(400, "This payment does not match the order")
+    return {"status": "paid", "payment_id": pay["id"], "amount": f"{Decimal(pay['amount']) / 100:.2f}"}
 
 
 @router.post("/razorpay-qr")

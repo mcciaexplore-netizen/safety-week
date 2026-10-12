@@ -24,8 +24,13 @@ class FakeRazorpay:
 
     def create_order(self, amount_paise, receipt, notes=None):
         oid = f"order_T{len(self.orders):04d}"
-        self.orders[oid] = {"amount": amount_paise, "receipt": receipt}
+        self.orders[oid] = {"amount": amount_paise, "receipt": receipt, "notes": notes or {}}
         return {"id": oid, "amount": amount_paise}
+
+    def fetch_order(self, oid):
+        if oid not in self.orders:
+            raise razorpay.RazorpayError("The id provided does not exist")
+        return {"id": oid, **self.orders[oid]}
 
     def pay(self, oid, status="captured", amount=None):
         pid = f"pay_T{len(self.payments):04d}"
@@ -71,7 +76,7 @@ def rz():
     saved = (settings.razorpay_key_id, settings.razorpay_key_secret, settings.razorpay_webhook_secret, settings.email_backend)
     settings.razorpay_key_id, settings.razorpay_key_secret, settings.razorpay_webhook_secret, settings.email_backend = KEY, SECRET, HOOK, "memory"
     mp = pytest.MonkeyPatch()
-    for name in ("create_order", "fetch_payment", "capture", "refund", "create_qr", "fetch_qr", "qr_payments"):
+    for name in ("create_order", "fetch_order", "fetch_payment", "capture", "refund", "create_qr", "fetch_qr", "qr_payments"):
         mp.setattr(razorpay, name, getattr(fake, name))
     with engine.begin() as c:
         before = c.execute(text("select status from events where invoice_prefix = 'NSW27'")).scalar()
@@ -246,6 +251,38 @@ def test_counter_qr_is_created_for_the_exact_amount_and_reports_paid(client, peo
     assert client.post(f"{API}/payments/razorpay-qr", headers=h, json={"amount": "5000000"}).status_code == 422
     assert client.get(f"{API}/payments/razorpay-qr/not-a-qr", headers=h).status_code == 404
     assert client.get(f"{API}/payments/razorpay-qr/{rz.create_qr(100, 'x', 'y')['id']}", headers=h).status_code == 404   # a QR with no branch note is nobody's
+
+
+def test_counter_checkout_order_is_created_and_verified(client, people, prods, rz):
+    h = people["til"]["h"]
+    sign = lambda oid, pid: hmac.new(SECRET.encode(), f"{oid}|{pid}".encode(), hashlib.sha256).hexdigest()
+    r = client.post(f"{API}/payments/counter-order", headers=h, json={"amount": "94.40", "note": "Counter Co"})
+    assert r.status_code == 200
+    o = r.json()
+    assert (o["amount"], o["currency"], o["key_id"]) == (9440, "INR", KEY) and rz.orders[o["order_id"]]["notes"]["branch"] == "TIL"
+    pid = rz.pay(o["order_id"])
+    verify = lambda hh, oid, p, sig=None: client.post(f"{API}/payments/counter-order/verify", headers=hh,
+                                                       json={"razorpay_order_id": oid, "razorpay_payment_id": p, "razorpay_signature": sig or sign(oid, p)})
+    ok = verify(h, o["order_id"], pid)
+    assert ok.status_code == 200 and ok.json() == {"status": "paid", "payment_id": pid, "amount": "94.40"}
+    assert verify(h, o["order_id"], pid, "f" * 64).status_code == 400                      # forged signature
+    assert verify(people["sbr"]["h"], o["order_id"], pid).status_code == 404               # another branch's order
+    assert verify(people["super"]["h"], o["order_id"], pid).status_code == 200             # the central admin may
+    other = rz.pay(o["order_id"], amount=5000)                                              # a payment of a different amount
+    assert verify(h, o["order_id"], other).status_code == 400
+    rz.payments[pid]["status"] = "authorized"                                               # not auto-captured: we capture it
+    assert verify(h, o["order_id"], pid).json()["status"] == "paid" and rz.payments[pid]["status"] == "captured"
+    # an order made by the store (no counter note) is not a counter payment
+    store_oid = rz.create_order(9440, "store", {"kind": "store"})["id"]
+    assert verify(h, store_oid, rz.pay(store_oid)).status_code == 404
+    assert client.post(f"{API}/payments/counter-order", headers=h, json={"amount": "0"}).status_code == 422
+    assert client.post(f"{API}/payments/counter-order", json={"amount": "10"}).status_code == 401
+    # the id it hands back is accepted on an invoice (Slogans - 10 x 15: Rs 94.00 payable)
+    o2 = client.post(f"{API}/payments/counter-order", headers=h, json={"amount": "94.00"}).json()
+    p2 = rz.pay(o2["order_id"])
+    assert verify(h, o2["order_id"], p2).status_code == 200
+    inv = staff_invoice(client, people, prods, "til", 1, payments=[{"mode": "RAZORPAY", "amount": "94.00", "reference": p2}])
+    assert inv.status_code == 201 and inv.json()["payment_status"] == "PAID"
 
 
 def test_a_razorpay_payment_on_an_invoice_must_be_real(client, people, prods, rz):
