@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Optional: Neon's DIRECT (non-pooled) connection string. Used only by `alembic upgrade`, because
     # schema migrations should not go through the pooler.
     database_url_direct: str = ""
+    # Server-only connection to Payment Desk's database. Used to allocate and
+    # persist Cash Receipts in its existing per-branch counter/table.
+    payment_desk_database_url: str = ""
     # Our own sign-in (POST /api/v1/auth/login) signs short-lived tokens with this secret (HS256).
     # 32+ random characters; never expose it to the browser. (SUPABASE_JWT_SECRET is still read, for old .env files.)
     jwt_secret: str = Field(default="", validation_alias=AliasChoices("JWT_SECRET", "SUPABASE_JWT_SECRET"))

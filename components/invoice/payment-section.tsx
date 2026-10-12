@@ -85,7 +85,15 @@ export function PaymentSection({
 
       {!draft.splitPayment ? (
         <div className="grid gap-2 sm:grid-cols-[minmax(0,180px)_1fr_auto]">
-          <select id="pay-mode-0" className={SELECT} value={rows[0]?.mode ?? ""} onChange={(e) => chooseSingle(e.target.value)}>
+          <select
+            id="pay-mode-0"
+            className={SELECT}
+            value={rows[0]?.mode ?? ""}
+            onChange={(e) => {
+              const mode = e.target.value;
+              chooseSingle(mode);
+            }}
+          >
             <option value="">Not paid yet</option>
             {PAYMENT_MODES.map((m) => (
               <option key={m} value={m}>{PAYMENT_OPTION_LABEL[m as "CASH" | "RAZORPAY"]}</option>
@@ -132,7 +140,10 @@ export function PaymentSection({
                 aria-label={`Mode for payment ${i + 1}`}
                 className={SELECT}
                 value={r.mode}
-                onChange={(e) => setRow(r.key, { mode: e.target.value as PaymentMode })}
+                onChange={(e) => {
+                  const mode = e.target.value as PaymentMode;
+                  setRow(r.key, { mode });
+                }}
               >
                 {PAYMENT_MODES.map((m) => (
                   <option key={m} value={m}>{PAYMENT_OPTION_LABEL[m as "CASH" | "RAZORPAY"]}</option>

@@ -35,6 +35,7 @@ Environment variables (Production), e.g. `vercel env add NAME production`:
 |---|---|
 | `ENVIRONMENT` | `production` |
 | `DATABASE_URL` | the **pooled** string |
+| `PAYMENT_DESK_DATABASE_URL` | Payment Desk's pooled PostgreSQL URL, configured as a server-only secret in `nsw-api`; used to write official Cash Receipts into the existing Payment Desk `cash_receipts` and `serial_counters` tables. Do not use a browser/public variable. |
 | `JWT_SECRET` | 48+ random characters |
 | `STORAGE_BACKEND` | `db` |
 | `CORS_ORIGINS` | `["https://YOUR-SITE"]` |
