@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, FileText, IndianRupee, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, FileText, IndianRupee, Package, Users } from "lucide-react";
 import { LowStockBanner } from "@/components/app/low-stock-alert";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
@@ -11,19 +11,20 @@ import { api } from "@/lib/services/api";
 
 interface Event { id: string; name: string; year: number; status: string; start_date: string | null; end_date: string | null; unconfirmed_products: number }
 interface Report { totals: { invoices: number; value: string | number }; by_branch: { code: string; name: string; invoices: number; value: string | number }[] }
+interface StockValue { totals: { units: number; value: string | number }; by_branch: { code: string; name: string; units: number; value: string | number }[] }
 interface User { active: boolean }
 
 export default function AdminOverview() {
   const data = useAsync(async () => {
-    const [events, report, users] = await Promise.all([
-      api<Event[]>("/admin/events"), api<Report>("/admin/reports"), api<User[]>("/admin/users"),
+    const [events, report, users, stock] = await Promise.all([
+      api<Event[]>("/admin/events"), api<Report>("/admin/reports"), api<User[]>("/admin/users"), api<StockValue>("/admin/stock-value"),
     ]);
-    return { event: events[0], report, users };
+    return { event: events[0], report, users, stock };
   }, "admin-overview");
 
   if (data.error) return <ErrorState message={data.error.message} onRetry={data.reload} />;
   if (!data.data) return <LoadingRows rows={6} />;
-  const { event, report, users } = data.data;
+  const { event, report, users, stock } = data.data;
   const warnings = [
     event.unconfirmed_products > 0 && { text: `${event.unconfirmed_products} product rate(s) are still the 2026 reference values and have not been confirmed for ${event.year}.`, href: "/admin/products", cta: "Review rates" },
     !(event.start_date && event.end_date) && { text: `The ${event.year} event dates have not been set.`, href: "/admin/event", cta: "Set dates" },
@@ -33,6 +34,7 @@ export default function AdminOverview() {
   const cards = [
     { label: "Invoices (sales)", value: String(report.totals.invoices), icon: FileText, sub: "submitted, PDF-generated or edited" },
     { label: "Invoice value", value: formatRupeesShort(Number(report.totals.value)), icon: IndianRupee, sub: "all branches" },
+    { label: "Stock value in hand", value: formatRupeesShort(Number(stock.totals.value)), icon: Package, sub: `${stock.totals.units} units, all branches (at rate, before GST)` },
     { label: `Event ${event.year}`, value: event.status, icon: CalendarClock, sub: event.start_date ? `${event.start_date} to ${event.end_date}` : "dates not set" },
     { label: "Active users", value: String(users.filter((u) => u.active).length), icon: Users, sub: `${users.length} accounts` },
   ];
@@ -52,7 +54,7 @@ export default function AdminOverview() {
           ))}
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map(({ label, value, icon: Icon, sub }) => (
           <div key={label} className="rounded-xl glass shadow-card p-5">
             <div className="flex items-center justify-between text-sm text-muted-foreground">{label}<Icon className="size-4" /></div>
@@ -68,6 +70,17 @@ export default function AdminOverview() {
           <tbody className="[&>tr]:border-t [&_td]:px-5 [&_td]:py-2">
             {report.by_branch.map((b) => (
               <tr key={b.code}><td>{b.name} <span className="font-mono text-xs text-muted-foreground">{b.code}</span></td><td className="text-right tabular-nums">{b.invoices}</td><td className="text-right tabular-nums">{formatRupeesShort(Number(b.value))}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="rounded-xl glass shadow-card">
+        <h2 className="border-b px-5 py-3 font-medium">Stock by branch</h2>
+        <table className="w-full text-sm">
+          <thead className="text-left text-muted-foreground"><tr className="[&>th]:px-5 [&>th]:py-2 [&>th]:font-medium"><th>Branch</th><th className="text-right">Units in hand</th><th className="text-right">Stock value</th></tr></thead>
+          <tbody className="[&>tr]:border-t [&_td]:px-5 [&_td]:py-2">
+            {stock.by_branch.map((b) => (
+              <tr key={b.code}><td>{b.name} <span className="font-mono text-xs text-muted-foreground">{b.code}</span></td><td className="text-right tabular-nums">{b.units}</td><td className="text-right tabular-nums">{formatRupeesShort(Number(b.value))}</td></tr>
             ))}
           </tbody>
         </table>

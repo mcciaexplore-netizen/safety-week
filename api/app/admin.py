@@ -534,6 +534,23 @@ def save_header(data: HeaderIn, s: Sess):
 
 
 # ------------------------------------------------------------------ reports
+@router.get("/stock-value")
+def stock_value(s: Sess):
+    """Stock in hand per branch for the current event: units and value at the current selling rate (before GST)."""
+    from .stock import levels  # stock imports this module, so import it here
+
+    e = _event_for(s, None)
+    rates = {pid: rate for pid, rate in s.execute(text("SELECT id, current_rate FROM products WHERE event_id = :e"), {"e": e.id})}
+    by_branch, units, value = [], 0, Decimal(0)
+    for b in s.scalars(select(Branch).where(Branch.active).order_by(Branch.name)):
+        items = [i for i in levels(s, b, e) if i.remaining is not None and i.remaining > 0]
+        b_units = sum(i.remaining for i in items)
+        b_value = sum((rates[i.product_id] * i.remaining for i in items), Decimal(0))
+        by_branch.append({"code": b.code, "name": b.name, "units": b_units, "value": b_value})
+        units, value = units + b_units, value + b_value
+    return {"totals": {"units": units, "value": value}, "by_branch": by_branch}
+
+
 @router.get("/reports")
 def reports(s: Sess, date_from: date | None = None, date_to: date | None = None,
             event_id: uuid.UUID | None = None):
