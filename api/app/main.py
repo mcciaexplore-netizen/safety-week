@@ -1,10 +1,11 @@
 import time
 import uuid
 from datetime import date
+from decimal import Decimal
 from typing import Annotated
 
 import jwt
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select, text
@@ -12,12 +13,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import admin, counter_pay, documents, edit_requests, exports, login, stock, store, store_orders, store_pay
-from . import repositories as repo
+from . import payment_desk_cash_receipts, repositories as repo
 from . import services
 from .auth import Principal, current_principal
 from .config import settings
 from .db import get_session
-from .models import INVOICE_STATUSES, User
+from .models import Branch, INVOICE_STATUSES, User
 from .schemas import (
     AuditOut,
     BranchOut,
@@ -176,6 +177,72 @@ def update_invoice(invoice_id: uuid.UUID, data: InvoiceUpdate,
     if invoice.status != "DRAFT":  # submitted or revised: a new version exists, so it gets its own PDF
         documents.generate_quietly(invoice.id, invoice.version, p)  # inline: serverless hosts may freeze background work
     return invoice
+
+
+@v1.post("/invoices/{invoice_id}/cash-receipt")
+def create_invoice_cash_receipt(invoice_id: uuid.UUID, request: Request,
+                                p: Principal = Depends(current_principal),
+                                s: Session = Depends(get_session)):
+    """Issue one official Payment Desk receipt for this submitted invoice's cash portion."""
+    try:
+        invoice = services.get_invoice(s, p, invoice_id)
+    except SERVICE_ERRORS as e:
+        raise _http(e) from None
+    if invoice.status == "DRAFT":
+        raise HTTPException(409, "Submit the invoice before issuing its Cash Receipt.")
+    cash_amount = sum((payment.amount for payment in invoice.payments if payment.mode == "CASH"), Decimal("0.00"))
+    if cash_amount <= 0:
+        raise HTTPException(422, "This invoice has no cash payment to receipt.")
+    branch = s.get(Branch, invoice.branch_id)
+    if branch is None:
+        raise HTTPException(409, "The invoice branch is not available.")
+    try:
+        receipt = payment_desk_cash_receipts.create_receipt(
+            source_invoice_id=invoice.id,
+            invoice_number=invoice.invoice_number,
+            party_name=invoice.company_name,
+            gstin=invoice.gstin,
+            amount=cash_amount,
+            email=p.email,
+            branch_code=branch.code,
+            ip_address=request.client.host if request.client else None,
+        )
+    except payment_desk_cash_receipts.PaymentDeskNotConfigured:
+        raise HTTPException(503, "The Payment Desk receipt connection is not configured.") from None
+    except payment_desk_cash_receipts.PaymentDeskAccessDenied:
+        raise HTTPException(403, "This account is not authorized to issue Payment Desk Cash Receipts for this branch.") from None
+    except Exception:
+        import logging
+        logging.getLogger("cash_receipt.integration").exception("Could not issue Payment Desk receipt for invoice %s", invoice.id)
+        raise HTTPException(502, "Could not save the Cash Receipt in Payment Desk. Please retry from the invoice confirmation.") from None
+    return receipt
+
+
+@v1.get("/invoices/{invoice_id}/cash-receipt")
+def get_invoice_cash_receipt(invoice_id: uuid.UUID,
+                             p: Principal = Depends(current_principal),
+                             s: Session = Depends(get_session)):
+    """Return the persisted receipt for printing; never trusts receipt fields from a URL."""
+    try:
+        invoice = services.get_invoice(s, p, invoice_id)
+    except SERVICE_ERRORS as e:
+        raise _http(e) from None
+    branch = s.get(Branch, invoice.branch_id)
+    if branch is None:
+        raise HTTPException(404, "Cash Receipt not found.")
+    try:
+        receipt = payment_desk_cash_receipts.get_receipt(invoice.id, p.email, branch.code)
+    except payment_desk_cash_receipts.PaymentDeskNotConfigured:
+        raise HTTPException(503, "The Payment Desk receipt connection is not configured.") from None
+    except payment_desk_cash_receipts.PaymentDeskAccessDenied:
+        raise HTTPException(403, "This account is not authorized to view Payment Desk Cash Receipts for this branch.") from None
+    except Exception:
+        import logging
+        logging.getLogger("cash_receipt.integration").exception("Could not read Payment Desk receipt for invoice %s", invoice.id)
+        raise HTTPException(502, "Could not load the Cash Receipt from Payment Desk.") from None
+    if receipt is None:
+        raise HTTPException(404, "No Cash Receipt has been issued for this invoice yet.")
+    return receipt
 
 
 @v1.get("/invoices/{invoice_id}/document")

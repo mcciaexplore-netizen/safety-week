@@ -19,13 +19,13 @@ const SELECT = "h-9 w-full rounded-lg border border-input bg-white px-3 text-sm 
 export function PickupDialog({ order, onClose, onDone }: { order: { id: string; number: string; total: string; payment_status: string; customer: { name: string } }; onClose: () => void; onDone: () => void }) {
   const rzp = useRazorpayEnabled();
   const prepaid = order.payment_status === "PAID";
-  const [mode, setMode] = useState<"CASH" | "RAZORPAY">("CASH");
+  const [mode, setMode] = useState<"" | "CASH" | "RAZORPAY">("");
   const [reference, setReference] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amount = Number(order.total);
   const needsQr = !prepaid && mode === "RAZORPAY" && rzp;
-  const canConfirm = prepaid || mode === "CASH" || !rzp || /^pay_/.test(reference);
+  const canConfirm = prepaid || (mode !== "" && (mode === "CASH" || !rzp || /^pay_/.test(reference)));
 
   async function confirm() {
     setBusy(true);
@@ -51,7 +51,12 @@ export function PickupDialog({ order, onClose, onDone }: { order: { id: string; 
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="pk-mode">How did the customer pay?</Label>
-              <select id="pk-mode" className={SELECT} value={mode} onChange={(e) => { setMode(e.target.value as "CASH" | "RAZORPAY"); setReference(""); }}>
+              <select id="pk-mode" className={SELECT} value={mode} onChange={(e) => {
+                const nextMode = e.target.value as "" | "CASH" | "RAZORPAY";
+                setMode(nextMode);
+                setReference("");
+              }}>
+                <option value="" disabled>Select payment method</option>
                 <option value="CASH">Cash</option>
                 <option value="RAZORPAY">Razorpay UPI</option>
               </select>
