@@ -116,8 +116,13 @@ def stock(s: Sess, p: Me, branch: str | None = None):
 @router.get("/low")
 def low_stock(s: Sess, p: Me, branch: str | None = None, limit: Annotated[int, Query(ge=1, le=50)] = 8):
     """For the dashboard: the materials that are low or out, emptiest first."""
-    b, e = _branch(s, p, branch), _event(s)
-    items = levels(s, b, e)
+    e = _event(s)
+    if p.is_super and branch is None:  # central admin without a branch picked: every branch together
+        items = []
+        for b in s.scalars(select(Branch).where(Branch.active).order_by(Branch.name)):
+            items += [i.model_copy(update={"name": f"{i.name} ({b.code})"}) for i in levels(s, b, e)]
+    else:
+        items = levels(s, _branch(s, p, branch), e)
     low = sorted((i for i in items if i.status in ("LOW", "OUT")), key=lambda i: (i.remaining or 0, i.line_order))
     return {"configured": sum(i.status != "UNSET" for i in items), "total": len(items), "items": low[:limit],
             "low_count": len(low)}
