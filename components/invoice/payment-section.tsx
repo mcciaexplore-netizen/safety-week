@@ -36,6 +36,8 @@ export function PaymentSection({
   const payable = view.totals.roundedTotal;
   const { paid, balance, status } = view.paymentSummary;
   const rows = draft.payments;
+  const c = draft.customer;
+  const buyer = { name: c.contactPerson || c.companyName, email: c.email, phone: c.contactPhone };
   const rzp = useRazorpayEnabled(); // when on, a Razorpay payment is collected with a QR and its id fills in by itself
 
   const setRow = (key: string, patch: Partial<InvoiceDraft["payments"][number]>) =>
@@ -114,7 +116,7 @@ export function PaymentSection({
           )}
           {rzp && rows[0]?.mode === "RAZORPAY" && (
             <div className="sm:col-span-3">
-              <RazorpayCollect amount={payable} paidId={rows[0].reference} onPaid={(id) => setRow(rows[0].key, { reference: id })} />
+              <RazorpayCollect customer={buyer} amount={payable} paidId={rows[0].reference} onPaid={(id) => setRow(rows[0].key, { reference: id })} />
             </div>
           )}
         </div>
@@ -172,7 +174,7 @@ export function PaymentSection({
               </Button>
               {rzp && r.mode === "RAZORPAY" && (
                 <div className="sm:col-span-5">
-                  <RazorpayCollect amount={r.amount} paidId={r.reference} onPaid={(id) => setRow(r.key, { reference: id })} />
+                  <RazorpayCollect customer={buyer} amount={r.amount} paidId={r.reference} onPaid={(id) => setRow(r.key, { reference: id })} />
                 </div>
               )}
               <Button

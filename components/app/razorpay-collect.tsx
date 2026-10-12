@@ -29,7 +29,11 @@ interface RazorpayReply { razorpay_payment_id: string; razorpay_order_id: string
  * UPI or card there, our server then asks Razorpay whether the money really arrived, and hands back the Razorpay payment id.
  * The invoice only accepts a payment Razorpay confirms.
  */
-export function RazorpayCollect({ amount, paidId, onPaid }: { amount: number; paidId?: string; onPaid: (paymentId: string) => void }) {
+export function RazorpayCollect({ amount, paidId, onPaid, customer }: {
+  amount: number; paidId?: string; onPaid: (paymentId: string) => void;
+  /** The buyer's details from the invoice; Razorpay's window opens with them filled in instead of asking again. */
+  customer?: { name?: string; email?: string; phone?: string };
+}) {
   const [state, setState] = useState<"idle" | "starting" | "paying" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
   const [paidAmount, setPaidAmount] = useState<number | null>(null);
@@ -53,6 +57,7 @@ export function RazorpayCollect({ amount, paidId, onPaid }: { amount: number; pa
         order_id: order.order_id,
         name: "MCCIA",
         description: "Counter payment",
+        prefill: { name: customer?.name?.trim() || undefined, email: customer?.email?.trim() || undefined, contact: customer?.phone?.replace(/[^\d+]/g, "") || undefined },
         theme: { color: "#003F8A" },
         method: { upi: true, card: true, netbanking: true, wallet: false, emi: false, paylater: false },
         modal: { ondismiss: () => setState((st) => (st === "paying" ? "idle" : st)) },
