@@ -586,7 +586,8 @@ def reports(s: Sess, date_from: date | None = None, date_to: date | None = None,
     def rows(sql: str):
         return [dict(r) for r in s.execute(text(sql), args).mappings()]
 
-    branches = rows(f"""SELECT b.code, b.name, count(i.id) AS invoices, coalesce(sum(i.grand_total), 0) AS value
+    branches = rows(f"""SELECT b.code, b.name, count(i.id) AS invoices, coalesce(sum(i.grand_total), 0) AS value,
+                               coalesce(sum(i.subtotal), 0) AS basic, coalesce(sum(i.cgst_total + i.sgst_total), 0) AS gst
                         FROM branches b LEFT JOIN invoices i ON i.branch_id = b.id AND {where}
                         GROUP BY b.id ORDER BY b.name""")
     products = rows(f"""SELECT ii.particulars AS name, sum(ii.quantity) AS quantity, sum(ii.basic_amount) AS value
@@ -605,7 +606,8 @@ def reports(s: Sess, date_from: date | None = None, date_to: date | None = None,
                        AND (CAST(:t AS date) IS NULL OR i.invoice_date <= :t) GROUP BY status ORDER BY status""")
     return {
         "event": {"id": e.id, "name": e.name, "year": e.year},
-        "totals": {"invoices": sum(b["invoices"] for b in branches), "value": sum(b["value"] for b in branches)},
+        "totals": {"invoices": sum(b["invoices"] for b in branches), "value": sum(b["value"] for b in branches),
+                   "basic": sum(b["basic"] for b in branches), "gst": sum(b["gst"] for b in branches)},
         "by_branch": branches, "by_product": products, "by_month": months, "by_status": statuses,
         "by_payment_mode": modes, "outstanding": outstanding,
     }

@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, FileText, IndianRupee, Package, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, FileText, IndianRupee, Landmark, Package, Receipt, Users } from "lucide-react";
 import { LowStockBanner } from "@/components/app/low-stock-alert";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
 import { useAsync } from "@/hooks/use-async";
-import { formatRupeesShort } from "@/lib/format";
+import { formatRupees, formatRupeesShort } from "@/lib/format";
 import { api } from "@/lib/services/api";
 
 interface Event { id: string; name: string; year: number; status: string; start_date: string | null; end_date: string | null; unconfirmed_products: number }
-interface Report { totals: { invoices: number; value: string | number }; by_branch: { code: string; name: string; invoices: number; value: string | number }[] }
+interface Report { totals: { invoices: number; value: string | number; basic: string | number; gst: string | number }; by_branch: { code: string; name: string; invoices: number; value: string | number; basic: string | number; gst: string | number }[] }
 interface StockValue { totals: { units: number; value: string | number }; by_branch: { code: string; name: string; units: number; value: string | number }[] }
 interface User { active: boolean }
 
@@ -33,7 +33,9 @@ export default function AdminOverview() {
 
   const cards = [
     { label: "Invoices (sales)", value: String(report.totals.invoices), icon: FileText, sub: "submitted, PDF-generated or edited" },
-    { label: "Invoice value", value: formatRupeesShort(Number(report.totals.value)), icon: IndianRupee, sub: "all branches" },
+    { label: "Invoice value", value: formatRupeesShort(Number(report.totals.value)), icon: IndianRupee, sub: "all branches, including GST" },
+    { label: "Basic income", value: formatRupees(Number(report.totals.basic)), icon: Landmark, sub: "sales before GST, all branches" },
+    { label: "GST collected", value: formatRupees(Number(report.totals.gst)), icon: Receipt, sub: "CGST + SGST on those sales" },
     { label: "Stock value in hand", value: formatRupeesShort(Number(stock.totals.value)), icon: Package, sub: `${stock.totals.units} units, all branches (at rate, before GST)` },
     { label: `Event ${event.year}`, value: event.status, icon: CalendarClock, sub: event.start_date ? `${event.start_date} to ${event.end_date}` : "dates not set" },
     { label: "Active users", value: String(users.filter((u) => u.active).length), icon: Users, sub: `${users.length} accounts` },
@@ -54,7 +56,7 @@ export default function AdminOverview() {
           ))}
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(({ label, value, icon: Icon, sub }) => (
           <div key={label} className="rounded-xl glass shadow-card p-5">
             <div className="flex items-center justify-between text-sm text-muted-foreground">{label}<Icon className="size-4" /></div>
@@ -66,10 +68,10 @@ export default function AdminOverview() {
       <div className="rounded-xl glass shadow-card">
         <h2 className="border-b px-5 py-3 font-medium">By branch</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-muted-foreground"><tr className="[&>th]:px-5 [&>th]:py-2 [&>th]:font-medium"><th>Branch</th><th className="text-right">Invoices</th><th className="text-right">Value</th></tr></thead>
+          <thead className="text-left text-muted-foreground"><tr className="[&>th]:px-5 [&>th]:py-2 [&>th]:font-medium"><th>Branch</th><th className="text-right">Invoices</th><th className="text-right">Basic income</th><th className="text-right">GST</th><th className="text-right">Value (incl. GST)</th></tr></thead>
           <tbody className="[&>tr]:border-t [&_td]:px-5 [&_td]:py-2">
             {report.by_branch.map((b) => (
-              <tr key={b.code}><td>{b.name} <span className="font-mono text-xs text-muted-foreground">{b.code}</span></td><td className="text-right tabular-nums">{b.invoices}</td><td className="text-right tabular-nums">{formatRupeesShort(Number(b.value))}</td></tr>
+              <tr key={b.code}><td>{b.name} <span className="font-mono text-xs text-muted-foreground">{b.code}</span></td><td className="text-right tabular-nums">{b.invoices}</td><td className="text-right tabular-nums">{formatRupees(Number(b.basic))}</td><td className="text-right tabular-nums">{formatRupees(Number(b.gst))}</td><td className="text-right tabular-nums">{formatRupeesShort(Number(b.value))}</td></tr>
             ))}
           </tbody>
         </table>

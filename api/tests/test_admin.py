@@ -230,7 +230,7 @@ def test_reports(client, people, su):
         "company_name": "Rep Co", "invoice_date": day, "action": status,
         "items": [{"product_id": prods["Danglers - Set of 20"], "quantity": qty}]}).json()
     before = client.get(f"{A}/reports", headers=su, params={"date_from": "2031-01-01", "date_to": "2031-12-31"}).json()
-    assert before["totals"] == {"invoices": 0, "value": 0}
+    assert before["totals"] == {"invoices": 0, "value": 0, "basic": 0, "gst": 0}
     make("sbr", 10, "2031-05-10", "submit")          # 10 x 170 = 1700 + 18% = 2006
     make("til", 1, "2031-05-20", "submit")           # 170 + 18% = 200.6 -> 201
     make("til", 5, "2031-06-01", "draft")            # drafts never count
@@ -239,6 +239,9 @@ def test_reports(client, people, su):
     assert len(rep["by_branch"]) == 5 and (by["SBR"]["invoices"], float(by["SBR"]["value"])) == (1, 2006.0)
     assert (by["TIL"]["invoices"], float(by["TIL"]["value"])) == (1, 201.0) and by["BHO"]["invoices"] == 0
     assert rep["totals"]["invoices"] == 2 and float(rep["totals"]["value"]) == 2207.0
+    # income before GST, and the GST collected (the invoice totals are rounded to the rupee, so basic + GST is 2206.60 against 2207)
+    assert (float(by["SBR"]["basic"]), float(by["SBR"]["gst"])) == (1700.0, 306.0)
+    assert (float(rep["totals"]["basic"]), round(float(rep["totals"]["gst"]), 2)) == (1870.0, 336.6)
     assert [(p["name"], p["quantity"]) for p in rep["by_product"]] == [("Danglers - Set of 20", 11)]
     assert [m["month"] for m in rep["by_month"]] == ["2031-05"]
     assert {s["status"]: s["invoices"] for s in rep["by_status"]} == {"SUBMITTED": 2, "DRAFT": 1}
