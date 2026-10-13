@@ -56,7 +56,7 @@ export function RazorpayCollect({ amount, paidId, onPaid, customer }: {
         currency: order.currency,
         order_id: order.order_id,
         name: "MCCIA",
-        image: `${window.location.origin}/brand/mccia-logo.png`,   // shown at the top of Razorpay's window
+        image: `${window.location.origin}/brand/mccia-logo-square.png`,   // shown at the top of Razorpay's window
         description: "Counter payment",
         prefill: { name: customer?.name?.trim() || undefined, email: customer?.email?.trim() || undefined, contact: customer?.phone?.replace(/[^\d+]/g, "") || undefined },
         theme: { color: "#003F8A" },
