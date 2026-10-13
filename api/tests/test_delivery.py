@@ -38,7 +38,7 @@ def test_delivery_is_off_until_weights_and_prices_are_set(client, people, prods,
     assert quote(client, prods, 1)["available"] is False
     assert client.get(f"{S}/catalogue").json()["delivery"]["enabled"] is False
     r = client.post(f"{S}/orders", json=deliver_body(prods))
-    assert r.status_code == 422 and "not available" in r.text
+    assert r.status_code == 409 and "switched off" in r.text
 
 
 def test_charge_is_worked_out_from_the_weight(client, people, prods, delivery_on):
@@ -123,3 +123,43 @@ def test_only_the_central_admin_sets_up_delivery(client, people, prods):
     assert client.put(f"{API}/admin/delivery-settings", json={**CONFIG, "enabled": False, "slabs": []}, headers=people["super"]["h"]).status_code == 200
     with engine.begin() as c:
         c.execute(text("delete from app_settings where key = 'delivery'"))
+
+
+@pytest.fixture()
+def modes_reset():
+    yield
+    with engine.begin() as c:
+        c.execute(text("delete from app_settings where key = 'checkout_modes'"))
+
+
+def test_the_central_admin_switches_each_way_of_ordering(client, people, prods, rz, delivery_on, modes_reset):  # noqa: F811
+    su = people["super"]["h"]
+    stock_for(client, people, prods, "TIL", POSTER, 20)
+    url = f"{API}/admin/checkout-modes"
+    got = client.get(url, headers=su).json()
+    assert (got["pay_at_branch"], got["online_pickup"], got["delivery"], got["delivery_ready"], got["online_ready"]) == (True, True, True, True, True)
+    assert client.get(f"{S}/catalogue").json()["modes"] == {"pay_at_branch": True, "online_pickup": True, "delivery": True}
+    assert client.put(url, json={"pay_at_branch": True, "online_pickup": True, "delivery": True}, headers=people["til_admin"]["h"]).status_code == 403
+    assert client.put(url, json={"pay_at_branch": False, "online_pickup": False, "delivery": False}, headers=su).status_code == 422   # at least one stays on
+
+    pickup = lambda method: client.post(f"{S}/orders", json=order_body(prods, lines=((POSTER, 1),), email="modes@example.com", payment_method=method))
+    assert client.put(url, json={"pay_at_branch": False, "online_pickup": True, "delivery": True}, headers=su).status_code == 200
+    assert client.get(f"{S}/catalogue").json()["modes"]["pay_at_branch"] is False
+    off = pickup("PAY_AT_PICKUP")
+    assert off.status_code == 409 and "switched off" in off.text                       # refused by the server, not just hidden
+    assert pickup("ONLINE").status_code == 201
+
+    assert client.put(url, json={"pay_at_branch": True, "online_pickup": False, "delivery": True}, headers=su).status_code == 200
+    assert pickup("ONLINE").status_code == 409 and pickup("PAY_AT_PICKUP").status_code == 201
+    assert client.post(f"{S}/orders", json=deliver_body(prods)).status_code == 201     # delivery still on
+
+    assert client.put(url, json={"pay_at_branch": True, "online_pickup": True, "delivery": False}, headers=su).status_code == 200
+    assert client.get(f"{S}/catalogue").json()["modes"]["delivery"] is False
+    assert client.post(f"{S}/orders", json=deliver_body(prods)).status_code == 409
+    assert client.get(f"{API}/admin/delivery-settings", headers=su).json()["enabled"] is False   # the same switch as on the Delivery page
+    assert client.put(url, json={"pay_at_branch": True, "online_pickup": True, "delivery": True}, headers=su).status_code == 200
+
+
+def test_delivery_cannot_be_switched_on_without_a_price_list(client, people, modes_reset):
+    r = client.put(f"{API}/admin/checkout-modes", json={"pay_at_branch": True, "online_pickup": True, "delivery": True}, headers=people["super"]["h"])
+    assert r.status_code == 422 and "price list" in r.text

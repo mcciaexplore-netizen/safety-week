@@ -11,7 +11,7 @@ export interface Product {
 }
 export interface Catalogue {
   open: boolean; event?: string; year?: number; branches: Branch[]; categories: string[]; products: Product[];
-  pickup_hold_days?: number; online_payments?: boolean; delivery?: { enabled: boolean; days: string };
+  pickup_hold_days?: number; online_payments?: boolean; delivery?: { enabled: boolean; days: string }; modes?: { pay_at_branch: boolean; online_pickup: boolean; delivery: boolean };
 }
 export interface Customer { id: string; email: string; name: string; phone: string }
 export type OrderStatus = "PENDING_PAYMENT" | "PLACED" | "READY" | "SHIPPED" | "DELIVERED" | "PICKED_UP" | "CANCELLED" | "EXPIRED";

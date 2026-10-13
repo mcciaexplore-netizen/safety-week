@@ -149,7 +149,8 @@ def catalogue(s: Sess):
     return {"open": e.status == "OPEN", "event": e.name, "year": e.year, "branches": [_branch_out(b) for b in branches],
             "categories": cats, "products": out, "pickup_hold_days": settings.pickup_hold_days,
             "online_payments": razorpay.enabled(),
-            "delivery": {"enabled": (lambda c: c.enabled and bool(c.slabs))(delivery.read_config(s)), "days": delivery.read_config(s).delivery_days}}
+            "delivery": {"enabled": delivery.effective_modes(s)["delivery"], "days": delivery.read_config(s).delivery_days},
+            "modes": delivery.effective_modes(s)}
 
 
 # ---------------------------------------------------------------- sign-in by e-mail code
@@ -354,6 +355,9 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
         raise HTTPException(422, "Home delivery must be paid online before it is sent")
     if body.payment_method == "ONLINE" and not razorpay.enabled():
         raise HTTPException(409, "Online payment is not available yet - please choose pay at pick-up")
+    modes = delivery.read_modes(s)  # the central admin can switch each way of ordering off
+    if (deliver and not modes["delivery"]) or (not deliver and body.payment_method == "ONLINE" and not modes["online_pickup"])             or (not deliver and body.payment_method == "PAY_AT_PICKUP" and not modes["pay_at_branch"]):
+        raise HTTPException(409, "This way of ordering is switched off right now. Please choose another option at checkout.")
     expire_unpaid(s)
     e = _event_open(s)
     branch = _branch(s, body.branch_code.upper())

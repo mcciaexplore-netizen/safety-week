@@ -78,6 +78,36 @@ def charge_for(cfg: DeliveryConfig, grams: int) -> Decimal:
     return last.charge + cfg.extra_per_kg * math.ceil((grams - last.up_to_grams) / 1000)
 
 
+# ---- which of the three ways to order the store offers (the central admin switches them) ----
+MODES_KEY = "checkout_modes"
+
+
+def read_modes(s: Session) -> dict:
+    """The admin's switches. Pay-at-branch and online-pick-up default to ON; delivery is the `enabled` flag of its own settings."""
+    row = s.scalar(select(AppSetting).where(AppSetting.key == MODES_KEY))
+    v = row.value if row else {}
+    return {"pay_at_branch": bool(v.get("pay_at_branch", True)), "online_pickup": bool(v.get("online_pickup", True)),
+            "delivery": read_config(s).enabled}
+
+
+def save_modes(s: Session, *, pay_at_branch: bool, online_pickup: bool) -> None:
+    value = {"pay_at_branch": pay_at_branch, "online_pickup": online_pickup}
+    row = s.scalar(select(AppSetting).where(AppSetting.key == MODES_KEY))
+    if row is None:
+        s.add(AppSetting(id=uuid.uuid4(), key=MODES_KEY, value=value))
+    else:
+        row.value = value
+
+
+def effective_modes(s: Session) -> dict:
+    """What a shopper can actually choose right now: switched on AND possible (online needs Razorpay, delivery needs a price list)."""
+    from . import razorpay
+
+    m, cfg, online = read_modes(s), read_config(s), razorpay.enabled()
+    return {"pay_at_branch": m["pay_at_branch"], "online_pickup": m["online_pickup"] and online,
+            "delivery": m["delivery"] and bool(cfg.slabs) and online}
+
+
 class Quote(BaseModel):
     available: bool
     reason: str = ""

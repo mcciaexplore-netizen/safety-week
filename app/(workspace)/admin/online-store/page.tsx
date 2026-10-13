@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ExternalLink, Globe, Store } from "lucide-react";
+import { CheckoutModes } from "@/components/admin/checkout-modes";
 import { CountUp } from "@/components/app/count-up";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingRows } from "@/components/app/states";
@@ -31,6 +32,7 @@ export default function OnlineStorePage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Online store" description="Sales on the public MCCIA Store compared with the five branch offices. Online orders are collected from, and counted in, the branch the customer chose."
         actions={<a href={storeUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-md border bg-white/60 px-4 text-[0.85rem] font-semibold text-muted-foreground hover:border-primary hover:text-primary"><ExternalLink className="size-4" />Open the store</a>} />
+      <CheckoutModes />
       {data.error ? <ErrorState message={data.error.message} onRetry={data.reload} /> : !a ? <LoadingRows rows={6} /> : (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Online figures">

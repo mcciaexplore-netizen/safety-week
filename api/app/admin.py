@@ -556,6 +556,37 @@ def save_delivery_settings(data: DeliveryConfig, s: Sess):
     return data
 
 
+class ModesIn(Strict):
+    pay_at_branch: bool
+    online_pickup: bool
+    delivery: bool
+
+
+@router.get("/checkout-modes")
+def get_checkout_modes(s: Sess):
+    from . import razorpay
+    from .delivery import read_config, read_modes
+
+    return {**read_modes(s), "delivery_ready": bool(read_config(s).slabs), "online_ready": razorpay.enabled()}
+
+
+@router.put("/checkout-modes")
+def save_checkout_modes(data: ModesIn, s: Sess):
+    """Switch the three ways of ordering on or off: pay at the branch, pay online and pick up, pay online and get it delivered."""
+    from .delivery import read_config, save_config, save_modes
+
+    if not (data.pay_at_branch or data.online_pickup or data.delivery):
+        raise HTTPException(422, "Keep at least one way of ordering switched on")
+    cfg = read_config(s)
+    if data.delivery and not cfg.slabs:
+        raise HTTPException(422, "Set the delivery price list on the Delivery page before switching delivery on")
+    save_modes(s, pay_at_branch=data.pay_at_branch, online_pickup=data.online_pickup)
+    if cfg.enabled != data.delivery:
+        save_config(s, cfg.model_copy(update={"enabled": data.delivery}))
+    commit(s)
+    return get_checkout_modes(s)
+
+
 # ------------------------------------------------------------------ reports
 @router.get("/stock-value")
 def stock_value(s: Sess):

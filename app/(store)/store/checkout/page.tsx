@@ -60,10 +60,12 @@ export default function CheckoutPage() {
   const phoneV = phone ?? customer?.phone ?? "";
 
   const canOnline = !!data.online_payments;
-  const canDeliver = canOnline && !!data.delivery?.enabled;
-  const choice = option ?? (canOnline ? "ONLINE" : "OFFLINE");
-  const delivering = choice === "DELIVERY" && canDeliver;
-  const online = canOnline && choice !== "OFFLINE";
+  // which ways of ordering the central admin has switched on (and that are possible on this server)
+  const modes = data.modes ?? { pay_at_branch: true, online_pickup: canOnline, delivery: !!data.delivery?.enabled && canOnline };
+  const available = (["ONLINE", "OFFLINE", "DELIVERY"] as const).filter((o) => (o === "OFFLINE" ? modes.pay_at_branch : o === "ONLINE" ? modes.online_pickup : modes.delivery));
+  const choice = option && available.includes(option) ? option : available[0] ?? null;
+  const delivering = choice === "DELIVERY";
+  const online = choice !== null && choice !== "OFFLINE";
   const deliveryOk = !delivering || (!!quote && quote.available);
   const payable = delivering && quote?.available ? Math.round(t.total + Number(quote.total)) : t.total;
 
@@ -141,12 +143,12 @@ export default function CheckoutPage() {
             <div role="radiogroup" aria-label="Payment and collection" className="space-y-3">
               {([
                 { id: "OFFLINE" as const, icon: Banknote, title: "Pay at the branch and pick up", line: "Reserve now, pay at the counter when you collect",
-                  note: `We hold your items for ${data.pickup_hold_days ?? 3} days. Your order is only confirmed as paid when you pay at the branch.`, ok: true },
+                  note: `We hold your items for ${data.pickup_hold_days ?? 3} days. Your order is only confirmed as paid when you pay at the branch.` },
                 { id: "ONLINE" as const, icon: CreditCard, title: "Pay online and pick up from the branch", line: "Pay with Razorpay, then collect from your branch",
-                  note: "UPI, cards and net banking in Razorpay's secure window. Your order is placed only once the payment is received; then your invoice is e-mailed.", ok: canOnline },
+                  note: "UPI, cards and net banking in Razorpay's secure window. Your order is placed only once the payment is received; then your invoice is e-mailed." },
                 { id: "DELIVERY" as const, icon: Truck, title: `Pay online and get it delivered (${data.delivery?.days ?? "2-3 working days"})`, line: "Delivered to your address by courier; delivery charge is added by weight",
-                  note: "You must pay online before it is sent. We e-mail your invoice and the tracking link when it ships.", ok: canDeliver },
-              ]).filter((o) => o.ok).map(({ id, icon: Icon, title, line, note }) => {
+                  note: "You must pay online before it is sent. We e-mail your invoice and the tracking link when it ships." },
+              ]).filter((o) => (o.id === "OFFLINE" ? modes.pay_at_branch : o.id === "ONLINE" ? modes.online_pickup : modes.delivery)).map(({ id, icon: Icon, title, line, note }) => {
                 const on = choice === id;
                 return (
                   <label key={id} data-testid={`option-${id}`} className={cn("flex cursor-pointer gap-3 rounded-xl border bg-white/70 p-4 transition", on ? "border-primary ring-[3px] ring-primary/10" : "hover:border-primary/40")}>
@@ -161,7 +163,7 @@ export default function CheckoutPage() {
                 );
               })}
             </div>
-            {!canOnline && <p className="text-xs text-muted-foreground">Online payment is not set up on this server, so only “pay at the branch” is available.</p>}
+            {available.length === 0 && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning" data-testid="no-order-options">Ordering is not available right now. Please try again later or contact a branch.</p>}
           </section>
 
           {delivering && (
@@ -202,7 +204,7 @@ export default function CheckoutPage() {
               {problem.short && <EnquireButton className="mt-3" />}
             </div>
           )}
-          <Button type="submit" size="lg" className="w-full" disabled={busy || !data.open || !branch || !deliveryOk} data-testid="place-order">
+          <Button type="submit" size="lg" className="w-full" disabled={busy || !data.open || !branch || !deliveryOk || !choice} data-testid="place-order">
             {busy && <Loader2 className="animate-spin" data-icon="inline-start" />}{delivering ? `Pay ${rupees(payable)} and deliver` : online ? `Pay ${rupees(payable)} online` : "Reserve order (pay at branch)"}
           </Button>
           {!data.open && <p className="text-xs text-warning">The store is not taking orders right now.</p>}
