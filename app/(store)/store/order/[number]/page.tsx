@@ -16,8 +16,9 @@ import { cn } from "@/lib/utils";
 const fmt = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
 
 function Timeline({ o }: { o: Order }) {
+  const unpaid = o.status === "PENDING_PAYMENT";  // reserved only: it is not a placed order until the payment is confirmed
   const steps = [
-    { label: "Order placed", at: o.created_at, done: true },
+    { label: unpaid ? "Awaiting payment" : "Order placed", at: unpaid ? null : o.created_at, done: !unpaid },
     { label: "Packed & ready for pick-up", at: o.ready_at, done: !!o.ready_at || o.status === "PICKED_UP" },
     { label: "Collected", at: o.picked_up_at, done: o.status === "PICKED_UP" },
   ];
@@ -106,7 +107,7 @@ function OrderView({ number }: { number: string }) {
         <div>
           <p className="label-xs">{params.get("t") && o.status === "PLACED" ? "Thank you — your order is placed" : "Order"}</p>
           <h1 className="mt-1 font-mono text-2xl font-bold" data-testid="order-number">{o.number}</h1>
-          <p className="text-sm text-muted-foreground">Placed {fmt(o.created_at)}</p>
+          <p className="text-sm text-muted-foreground">{awaiting ? "Started" : "Placed"} {fmt(o.created_at)}</p>
         </div>
         <OrderStatusPill status={o.status} />
       </div>
