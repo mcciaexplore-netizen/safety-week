@@ -191,6 +191,7 @@ class AuditOut(Out):
     created_at: datetime
     actor_name: str
     branch_id: uuid.UUID | None
+    branch_name: str | None = None
     action: str
     entity_type: str
     entity_id: uuid.UUID | None

@@ -217,3 +217,24 @@ def test_audit_endpoint_access(client, people, prods):
     assert prefix == sorted(prefix, key=lambda r: r["created_at"], reverse=True)           # newest first
     assert client.get(url, params={"limit": 0}, headers=people["super"]["h"]).status_code == 422
     assert client.get(url, params={"entity_id": str(uuid.uuid4())}, headers=people["super"]["h"]).json() == []
+
+
+def test_audit_view_names_the_things_and_hides_secrets(client, people, prods):
+    h, sup = people["til"]["h"], people["super"]["h"]
+    inv = client.post(f"{API}/invoices", json=body(prods, 7, action="submit"), headers=h).json()
+    row = client.get(f"{API}/audit-logs", params={"entity_id": inv["id"]}, headers=sup).json()[0]
+    m = row["metadata"]
+    assert m["customer"] == "Audit Co" and m["items"] == [{"name": "Badges", "qty": 7, "rate": m["items"][0]["rate"]}]
+    assert row["branch_name"] and "password" not in str(client.get(f"{API}/audit-logs", params={"entity_type": "user", "limit": 500}, headers=sup).json()).lower()
+    # stock rows say which product and branch, in words
+    til = client.get(f"{API}/stock", headers=people["til_admin"]["h"]).json()
+    first = til["items"][0]
+    client.put(f"{API}/stock", json={"items": [{"product_id": first["product_id"], "opening_qty": 123, "low_threshold": 5}]}, headers=people["til_admin"]["h"])
+    stock_rows = [r for r in client.get(f"{API}/audit-logs", params={"action": "stock.", "limit": 20}, headers=sup).json() if r["metadata"].get("_subject")]
+    assert stock_rows and first["name"] in stock_rows[0]["metadata"]["_subject"] and "Tilak" in stock_rows[0]["metadata"]["_subject"]
+    # leave the stock as it was: a limit left behind would make later tests fail
+    if first["opening_qty"] is None:
+        with engine.begin() as c:
+            c.execute(text("delete from branch_stock where product_id = :p and branch_id = :b"), {"p": first["product_id"], "b": inv["branch_id"]})
+    else:
+        client.put(f"{API}/stock", json={"items": [{"product_id": first["product_id"], "opening_qty": first["opening_qty"], "low_threshold": first["low_threshold"]}]}, headers=people["til_admin"]["h"])

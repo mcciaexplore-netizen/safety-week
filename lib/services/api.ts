@@ -207,9 +207,9 @@ export const apiServices: Pick<Services, "catalog" | "invoices" | "dashboard" | 
     async listAudit(filter) {
       const q = new URLSearchParams({ limit: "200" });
       if (filter?.action) q.set("action", filter.action);
-      const rows = await api<{ id: string; created_at: string; actor_name: string; branch_id: string | null;
+      const rows = await api<{ id: string; created_at: string; actor_name: string; branch_id: string | null; branch_name?: string | null;
         action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> }[]>(`/audit-logs?${q}`);
-      return rows.map((r) => ({ id: r.id, createdAt: r.created_at, actor: r.actor_name, branchId: r.branch_id,
+      return rows.map((r) => ({ id: r.id, createdAt: r.created_at, actor: r.actor_name, branchId: r.branch_id, branchName: r.branch_name,
         action: r.action, entityType: r.entity_type, entityId: r.entity_id, metadata: r.metadata }));
     },
   },

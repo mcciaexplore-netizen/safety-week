@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, LoadingRows } from "@/components/app/states";
 import { useAsync } from "@/hooks/use-async";
 import { useSession } from "@/hooks/use-session";
 import { formatDateTime } from "@/lib/format";
+import { describeAudit } from "@/lib/audit-format";
 import { API_MODE, services } from "@/lib/services";
 
 const GROUPS = [
@@ -19,23 +20,6 @@ const GROUPS = [
   ["event.", "Event settings"],
   ["discount_rule.", "Discount rules"],
 ] as const;
-
-/** One line of plain language for the details column. */
-function details(m: Record<string, unknown>): string {
-  const parts: string[] = [];
-  if (m.invoice_number) parts.push(`${m.invoice_number}${m.version ? ` v${m.version}` : ""}`);
-  if (m.reason) parts.push(`reason: ${m.reason}`);
-  if (m.note && !m.from_branch) parts.push(`note: ${m.note}`);
-  if (m.previous_total !== undefined) parts.push(`total ${m.previous_total} → ${m.new_total}`);
-  if (m.changes && typeof m.changes === "object") {
-    for (const [k, v] of Object.entries(m.changes as Record<string, { old: unknown; new: unknown }>))
-      parts.push(`${k}: ${JSON.stringify(v.old)} → ${JSON.stringify(v.new)}`);
-  }
-  if (m.new && typeof m.new === "object") parts.push(String((m.new as Record<string, unknown>).name ?? "created"));
-  if (m.from_branch && m.to_branch) parts.push(`${m.quantity} × ${m.product}: ${m.from_branch} → ${m.to_branch}${m.note ? ` (${m.note})` : ""}`);
-  if (m.role) parts.push(`role ${m.role}`);
-  return parts.join(" · ") || "—";
-}
 
 export default function AuditLogPage() {
   const { session } = useSession();
@@ -84,20 +68,31 @@ export default function AuditLogPage() {
             <thead className="bg-secondary/60 text-left">
               <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
                 <th>When</th>
-                <th>Action</th>
-                <th>By</th>
-                <th>Details</th>
+                <th>Who</th>
+                <th>Branch</th>
+                <th>What happened</th>
               </tr>
             </thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">
-              {list.data.map((e) => (
-                <tr key={e.id} data-testid="audit-row">
-                  <td className="whitespace-nowrap">{formatDateTime(e.createdAt)}</td>
-                  <td className="font-mono text-xs">{e.action}</td>
-                  <td>{e.actor || <span className="text-muted-foreground">system / database</span>}</td>
-                  <td className="max-w-xl truncate" title={details(e.metadata)}>{details(e.metadata)}</td>
-                </tr>
-              ))}
+              {list.data.map((e) => {
+                const d = describeAudit(e.action, e.metadata);
+                return (
+                  <tr key={e.id} data-testid="audit-row" className="align-top">
+                    <td className="whitespace-nowrap">{formatDateTime(e.createdAt)}</td>
+                    <td>{e.actor || <span className="text-muted-foreground">system / database</span>}</td>
+                    <td className="whitespace-nowrap">{e.branchName ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="min-w-[22rem]">
+                      <p className="font-medium">{d.title}</p>
+                      {d.lines.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                          {d.lines.map((l, i) => <li key={i}>{l}</li>)}
+                        </ul>
+                      )}
+                      <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">{e.action}</p>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

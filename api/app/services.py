@@ -157,6 +157,11 @@ def log_event(s: Session, p: Principal, action: str, *, entity_type: str, entity
 
 
 def _audit(s: Session, p: Principal, invoice: Invoice, action: str, **extra) -> None:
+    # who it was for and what was on it, so the log says what was sold, not just that an invoice changed
+    extra.setdefault("customer", invoice.company_name)
+    extra.setdefault("total", str(invoice.grand_total))
+    extra.setdefault("items", [{"name": " ".join(i.particulars.split()), "qty": i.quantity, "rate": str(i.rate)}
+                               for i in invoice.items if i.quantity][:60])
     log_event(s, p, action, entity_type="invoice", entity_id=invoice.id, branch_id=invoice.branch_id,
               invoice_number=invoice.invoice_number, status=invoice.status, version=invoice.version, **extra)
 
@@ -316,6 +321,82 @@ def list_audit(s: Session, p: Principal, *, action: str | None = None, entity_ty
     if entity_id:
         stmt = stmt.where(AuditLog.entity_id == entity_id)
     return list(s.scalars(stmt))
+
+
+_SECRET_KEYS = ("password", "hash", "token", "secret")
+
+
+def _scrub(value):
+    """Drop anything secret-looking from a logged row (the database trigger copies whole rows, password hashes included)."""
+    if isinstance(value, dict):
+        return {k: _scrub(v) for k, v in value.items() if not any(w in k.lower() for w in _SECRET_KEYS)}
+    return value
+
+
+def audit_view(s: Session, rows: list[AuditLog]) -> list[dict]:
+    """The audit rows with names filled in (product, branch, user, ...) so the screen never has to show raw ids,
+    and without secrets. Read-only: the stored rows are untouched."""
+    from .models import Branch, BranchStock, Product, User  # local: keeps module import light
+
+    def row_ids(m: dict, *keys: str) -> set:
+        found = set()
+        for part in (m.get("new"), m.get("old")):
+            if isinstance(part, dict):
+                found |= {part[k] for k in keys if part.get(k)}
+        return found
+
+    # every id that appears anywhere in the logged data, so each can be shown as a name
+    import json
+    import re
+    uuid_re = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+    mentioned = set()
+    for r in rows:
+        mentioned |= set(uuid_re.findall(json.dumps(_scrub(dict(r.metadata_ or {})), default=str)))
+        if r.branch_id:
+            mentioned.add(str(r.branch_id))
+    stock_ids = {r.entity_id for r in rows if r.entity_type == "stock" and r.entity_id}
+    stock = {b.id: b for b in s.scalars(select(BranchStock).where(BranchStock.id.in_(stock_ids)))} if stock_ids else {}
+    for b in stock.values():
+        mentioned |= {str(b.product_id), str(b.branch_id)}
+    mentioned |= {str(r.entity_id) for r in rows if r.entity_id}
+    ids = [uuid.UUID(x) for x in mentioned]
+    products = {str(i): " ".join(n.split()) for i, n in s.execute(select(Product.id, Product.name).where(Product.id.in_(ids)))} if ids else {}
+    branches = {str(i): n for i, n in s.execute(select(Branch.id, Branch.name).where(Branch.id.in_(ids)))} if ids else {}
+    prod_by_id = products
+    user_by_id = {str(i): f"{n} ({e})" for i, n, e in s.execute(select(User.id, User.name, User.email).where(User.id.in_(ids)))} if ids else {}
+
+    out = []
+    for r in rows:
+        m = _scrub(dict(r.metadata_ or {}))
+        subject = None
+        if r.entity_type == "stock":
+            b = stock.get(r.entity_id)
+            pid = str(b.product_id) if b else next(iter(row_ids(m, "product_id")), None)
+            bid = str(b.branch_id) if b else next(iter(row_ids(m, "branch_id")), None)
+            product = products.get(str(pid)) if pid else None
+            if product or bid:
+                subject = f"{product or 'a product'} at {branches.get(str(bid), 'a branch')}"
+        elif r.entity_type == "product":
+            part = m.get("new") or m.get("old") or {}
+            subject = (part.get("name") and " ".join(str(part["name"]).split())) or prod_by_id.get(str(r.entity_id))
+        elif r.entity_type == "user":
+            part = m.get("new") or m.get("old") or {}
+            subject = (f"{part['name']} ({part.get('email', '')})" if part.get("name") else None) or user_by_id.get(str(r.entity_id))
+        elif r.entity_type == "branch":
+            subject = branches.get(str(r.entity_id)) or (m.get("new") or m.get("old") or {}).get("name")
+        else:
+            part = m.get("new") or m.get("old") or {}
+            subject = part.get("name") if isinstance(part, dict) else None
+        if subject:
+            m["_subject"] = subject
+        names = {i: products.get(i) or branches.get(i) or user_by_id.get(i)
+                 for i in set(uuid_re.findall(json.dumps(m, default=str))) if products.get(i) or branches.get(i) or user_by_id.get(i)}
+        if names:
+            m["_names"] = names
+        out.append({"id": r.id, "created_at": r.created_at, "actor_name": r.actor_name, "branch_id": r.branch_id,
+                    "branch_name": branches.get(str(r.branch_id)), "action": r.action, "entity_type": r.entity_type,
+                    "entity_id": r.entity_id, "metadata": m})
+    return out
 
 
 def list_invoices(s: Session, p: Principal, branch_code: str | None = None, *, q: str | None = None,

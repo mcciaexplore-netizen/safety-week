@@ -93,6 +93,7 @@ export interface AuditEntry {
   createdAt: string;
   actor: string;
   branchId: string | null;
+  branchName?: string | null;
   action: string;
   entityType: string;
   entityId: string | null;

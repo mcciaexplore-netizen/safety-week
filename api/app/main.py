@@ -296,7 +296,7 @@ def audit_logs(action: Annotated[str | None, Query(max_length=60, description="p
                limit: Annotated[int, Query(ge=1, le=500)] = 100, p: Principal = Depends(current_principal),
                s: Session = Depends(get_session)):
     try:
-        return services.list_audit(s, p, action=action, entity_type=entity_type, entity_id=entity_id, limit=limit)
+        return services.audit_view(s, services.list_audit(s, p, action=action, entity_type=entity_type, entity_id=entity_id, limit=limit))
     except SERVICE_ERRORS as e:
         raise _http(e) from None
 
