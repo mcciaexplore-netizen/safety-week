@@ -93,7 +93,7 @@ class InvoiceCreate(BaseModel):
     contact_person: str = ""
     contact_phone: str = ""
     invoice_date: date
-    discount_percent: Decimal = Field(default=Decimal(0), ge=0, le=100)
+    discount_percent: Decimal = Field(default=Decimal(0), ge=0, le=10)  # the most a proforma may discount the rates
     items: list[InvoiceItemIn] = []
     amount_in_words: str | None = None  # None = generate
     payment_details: str = ""  # free-text notes, printed after the structured payments

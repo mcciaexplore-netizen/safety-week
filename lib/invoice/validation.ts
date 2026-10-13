@@ -17,7 +17,7 @@ const customer = z.object({
 
 const draftSchema = z.object({
   customer,
-  discountPercent: z.number().min(0, "Cannot be negative").max(100, "Cannot exceed 100"),
+  discountPercent: z.number().min(0, "Cannot be negative").max(10, "Discount cannot be more than 10%"),
 });
 
 const submitSchema = draftSchema.extend({

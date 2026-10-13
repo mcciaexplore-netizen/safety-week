@@ -205,7 +205,7 @@ export function InvoiceForm({
               id="discountPercent"
               type="number"
               min={0}
-              max={100}
+              max={10}
               step="0.01"
               className="max-w-40"
               value={draft.discountPercent === 0 ? "" : draft.discountPercent}

@@ -184,3 +184,14 @@ def test_submit_needs_a_customer_mobile_number(client, people, prods):
     assert client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "contact_phone": ""}, headers=h).status_code == 201
     ok = client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "action": "submit", "contact_phone": "+91 98765 43210"}, headers=h)
     assert ok.status_code == 201
+
+
+def test_discount_is_capped_at_ten_percent(client, people, prods):
+    h = people["til"]["h"]
+    ok = client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "discount_percent": "10"}, headers=h)
+    assert ok.status_code == 201 and float(ok.json()["discount_percent"]) == 10.0
+    for over in ("10.01", "11", "50", "100"):
+        r = client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "discount_percent": over}, headers=h)
+        assert r.status_code == 422, over
+    # a branch admin and the central admin are held to the same cap
+    assert client.post(f"{API}/invoices", json={**body(prods, [("Badges", 1)]), "discount_percent": "25"}, headers=people["super"]["h"], params={"branch": "TIL"}).status_code == 422
