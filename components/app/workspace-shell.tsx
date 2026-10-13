@@ -114,8 +114,8 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   }
 
   const renderSidebar = (compact: boolean) => (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className={cn("space-y-4 border-b border-sidebar-border", compact ? "p-2" : "p-4")}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
+      <div className={cn("shrink-0 space-y-4 border-b border-sidebar-border", compact ? "p-2" : "p-4")}>
         <Link href="/dashboard" onClick={() => setOpen(false)} className="block w-fit rounded-md" title="Dashboard">
           <MCCIALogo height={compact ? 14 : 24} className={compact ? "max-w-10" : undefined} />
         </Link>
@@ -129,7 +129,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           </div>
         )}
       </div>
-      <nav className={cn("flex-1 space-y-1", compact ? "p-2" : "p-3")} aria-label="Workspace">
+      <nav className={cn("min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain", compact ? "p-2" : "p-3")} aria-label="Workspace">
         {(session.user.role === "SUPER_ADMIN" ? SUPER_NAV : [...NAV, ...(API_MODE ? [EDIT_REQ_NAV, ONLINE_NAV] : []), ...(API_MODE && session.user.role !== "BRANCH_USER" ? ADMIN_NAV : [])]).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -148,7 +148,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
-      <div className={cn("space-y-1 border-t border-sidebar-border", compact ? "p-2" : "p-3")}>
+      <div className={cn("shrink-0 space-y-1 border-t border-sidebar-border", compact ? "p-2" : "p-3")}>
         <Link
           href="/select-branch"
           title={compact ? "Switch branch" : undefined}
@@ -176,7 +176,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         data-testid="sidebar"
         data-collapsed={collapsed ? "1" : "0"}
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 border-r border-sidebar-border transition-[width] duration-200 lg:block",
+          "sticky top-0 hidden h-screen max-h-dvh shrink-0 border-r border-sidebar-border transition-[width] duration-200 lg:block",
           collapsed ? "w-16" : "w-64",
         )}
       >
