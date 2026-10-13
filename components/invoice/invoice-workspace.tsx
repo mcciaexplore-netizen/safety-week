@@ -48,7 +48,6 @@ export function InvoiceWorkspace({
   const [serverError, setServerError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<Invoice | null>(null);
-  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   // The proforma preview: opened by the floating button ("view"), or by Submit as the final check ("submit").
@@ -110,15 +109,8 @@ export function InvoiceWorkspace({
       return;
     }
     setSaving(action);
-    const cashAmount = draft.payments
-      .filter((payment) => payment.mode === "CASH")
-      .reduce((sum, payment) => sum + Math.max(0, Number(payment.amount) || 0), 0);
     const firstSubmit = action === "submit" && (!draft.status || draft.status === "DRAFT");
     const localPreview = !API_MODE && ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-    const receiptWindow = firstSubmit && (API_MODE || localPreview) && cashAmount > 0
-      ? window.open("about:blank", "_blank")
-      : null;
-    setReceiptPreviewUrl(null);
     setReceiptError(null);
     try {
       const inv = await services.invoices.save({ draft, action });
@@ -139,23 +131,19 @@ export function InvoiceWorkspace({
               body: JSON.stringify({}),
             });
             const url = `/cash-receipt-preview?invoiceId=${encodeURIComponent(inv.id)}`;
-            setReceiptPreviewUrl(url);
-            if (receiptWindow && !receiptWindow.closed) receiptWindow.location.assign(url);
+            window.location.assign(url);
+            return;
           } catch (receiptFailure) {
-            if (receiptWindow && !receiptWindow.closed) receiptWindow.close();
             setReceiptError(receiptFailure instanceof Error ? receiptFailure.message : "The Cash Receipt could not be issued.");
           }
         } else if (firstSubmit && savedCashAmount > 0 && localPreview) {
           const url = cashReceiptPreviewUrl({ invoice: inv, amount: savedCashAmount, branch: session?.branch.name ?? "", issuer: session?.user.name ?? "" });
-          setReceiptPreviewUrl(url);
-          if (receiptWindow && !receiptWindow.closed) receiptWindow.location.assign(url);
-        } else if (receiptWindow && !receiptWindow.closed) {
-          receiptWindow.close();
+          window.location.assign(url);
+          return;
         }
       }
       else setNotice(`Draft saved at ${formatDateTime(inv.updatedAt)}`);
     } catch (e) {
-      if (receiptWindow && !receiptWindow.closed) receiptWindow.close();
       if (e instanceof ValidationError) setAttempted(mode);
       setServerError(e instanceof Error ? e.message : "Could not save the invoice.");
     } finally {
@@ -166,7 +154,6 @@ export function InvoiceWorkspace({
 
   async function retryCashReceipt() {
     if (!submitted) return;
-    const receiptWindow = window.open("about:blank", "_blank");
     setReceiptError(null);
     try {
       await api(`/invoices/${encodeURIComponent(submitted.id)}/cash-receipt`, {
@@ -174,10 +161,8 @@ export function InvoiceWorkspace({
         body: JSON.stringify({}),
       });
       const url = `/cash-receipt-preview?invoiceId=${encodeURIComponent(submitted.id)}`;
-      setReceiptPreviewUrl(url);
-      if (receiptWindow && !receiptWindow.closed) receiptWindow.location.assign(url);
+      window.location.assign(url);
     } catch (e) {
-      if (receiptWindow && !receiptWindow.closed) receiptWindow.close();
       setReceiptError(e instanceof Error ? e.message : "The Cash Receipt could not be issued.");
     }
   }
@@ -396,17 +381,6 @@ export function InvoiceWorkspace({
               {submitted && formatRupees(submitted.totals.roundedTotal)}.
             </DialogDescription>
           </DialogHeader>
-          {receiptPreviewUrl && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-              <p className="font-semibold">Cash payment recorded on this invoice.</p>
-              <p className="mt-1">{API_MODE
-                ? "The official receipt is saved in Payment Desk and uses its existing branch receipt sequence."
-                : "The local printable preview contains only its cash portion and is marked preview-only."}</p>
-              <Link href={receiptPreviewUrl} target="_blank" className="mt-2 inline-flex font-medium underline underline-offset-4">
-                Open cash receipt preview
-              </Link>
-            </div>
-          )}
           {receiptError && (
             <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
               <p className="font-medium text-destructive">Invoice saved, but the Cash Receipt was not issued.</p>
