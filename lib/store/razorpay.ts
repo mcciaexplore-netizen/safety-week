@@ -40,6 +40,7 @@ export async function payForOrder(order: Order, auth: { token?: string | null; t
       currency: pay.currency,
       order_id: pay.razorpay_order_id,
       name: "MCCIA Store",
+      image: `${window.location.origin}/brand/mccia-logo.png`,   // shown at the top of Razorpay's window
       description: `Order ${order.number}`,
       prefill: { name: order.customer.name, email: order.customer.email, contact: order.customer.phone },
       theme: { color: "#003F8A" },
