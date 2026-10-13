@@ -24,6 +24,7 @@ import {
   Repeat,
   ShoppingBag,
   Store,
+  Truck,
   X,
 } from "lucide-react";
 import { MCCIALogo } from "@/components/brand/logo";
@@ -55,6 +56,7 @@ const SUPER_NAV = [
   EDIT_REQ_NAV,
   { href: "/online-orders", label: "Online orders", icon: ShoppingBag },
   { href: "/admin/online-store", label: "Online store", icon: Store },
+  { href: "/admin/delivery", label: "Delivery", icon: Truck },
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/stock", label: "Stock", icon: Boxes },
   { href: "/admin/event", label: "Event configuration", icon: CalendarCog },

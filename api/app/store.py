@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import documents, mailer, razorpay, services
+from . import delivery, documents, mailer, razorpay, services
 from . import repositories as repo
 from .auth import Principal
 from .config import settings
@@ -148,7 +148,8 @@ def catalogue(s: Sess):
     cats = sorted({p["category"] for p in out})
     return {"open": e.status == "OPEN", "event": e.name, "year": e.year, "branches": [_branch_out(b) for b in branches],
             "categories": cats, "products": out, "pickup_hold_days": settings.pickup_hold_days,
-            "online_payments": razorpay.enabled()}
+            "online_payments": razorpay.enabled(),
+            "delivery": {"enabled": (lambda c: c.enabled and bool(c.slabs))(delivery.read_config(s)), "days": delivery.read_config(s).delivery_days}}
 
 
 # ---------------------------------------------------------------- sign-in by e-mail code
@@ -228,6 +229,14 @@ class OrderLine(BaseModel):
     quantity: int = Field(ge=1, le=MAX_QTY)
 
 
+class ShipTo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    address: str = Field(min_length=10, max_length=300)  # house / street / area
+    city: str = Field(min_length=2, max_length=100)
+    state: str = Field(min_length=2, max_length=100)
+    pincode: str = Field(pattern=r"^[1-9][0-9]{5}$")
+
+
 class OrderIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     branch_code: str = Field(min_length=3, max_length=3)
@@ -236,6 +245,8 @@ class OrderIn(BaseModel):
     email: EmailStr
     phone: str = Field(pattern=r"^[0-9+ \-]{8,20}$")
     payment_method: Literal["PAY_AT_PICKUP", "ONLINE"] = "PAY_AT_PICKUP"
+    fulfilment: Literal["PICKUP", "DELIVERY"] = "PICKUP"
+    ship_to: ShipTo | None = None  # required for DELIVERY, and only then
     note: str = Field(default="", max_length=300)
 
 
@@ -253,6 +264,13 @@ def order_out(s: Session, o: Order, *, token: bool = False) -> dict:
         "hold_until": (o.created_at + timedelta(days=settings.pickup_hold_days)).isoformat(),
         "paid_at": o.paid_at.isoformat() if o.paid_at else None,
         "payment": payment_info(o),
+        "fulfilment": o.fulfilment,
+        "delivery": None if o.fulfilment != "DELIVERY" else {
+            "address": o.ship_address, "city": o.ship_city, "state": o.ship_state, "pincode": o.ship_pincode,
+            "weight_grams": o.weight_grams, "charge": f"{o.shipping_charge:.2f}", "courier": o.courier or delivery.read_config(s).courier,
+            "days": delivery.read_config(s).delivery_days, "tracking_no": o.tracking_no, "tracking_url": o.tracking_url,
+            "shipped_at": o.shipped_at.isoformat() if o.shipped_at else None,
+            "delivered_at": o.delivered_at.isoformat() if o.delivered_at else None},
         "items": [{"name": _clean(i.particulars), "quantity": i.quantity, "rate": f"{i.rate:.2f}", "amount": f"{i.total_amount:.2f}"}
                   for i in inv.items],
     }
@@ -327,6 +345,13 @@ def availability(body: AvailIn, s: Sess):
 def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Header()] = None):
     from .store_pay import expire_unpaid
 
+    deliver = body.fulfilment == "DELIVERY"
+    if deliver and body.ship_to is None:
+        raise HTTPException(422, "Please enter your full delivery address")
+    if not deliver and body.ship_to is not None:
+        raise HTTPException(422, "A delivery address is only for home delivery")
+    if deliver and body.payment_method != "ONLINE":
+        raise HTTPException(422, "Home delivery must be paid online before it is sent")
     if body.payment_method == "ONLINE" and not razorpay.enabled():
         raise HTTPException(409, "Online payment is not available yet - please choose pay at pick-up")
     expire_unpaid(s)
@@ -347,6 +372,10 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
         if pr is None or not pr.active or not pr.online_enabled:
             raise HTTPException(422, "One of the products is no longer available")
 
+    cfg = delivery.read_config(s)
+    quote = delivery.quote(cfg, products, [(l.product_id, l.quantity) for l in body.items]) if deliver else None
+    if quote is not None and not quote.available:
+        raise HTTPException(422, quote.reason)
     # one buyer at a time per branch, so the last unit cannot be sold twice
     s.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"store:{branch.id}"))))
     have = {i.product_id: i.remaining for i in levels(s, branch, e)}
@@ -369,16 +398,20 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
             problems.append({"product_id": str(l.product_id), "name": name, "message": msg, "alternatives": alts})
         raise HTTPException(409, {"message": " ".join(x["message"] for x in problems), "short": problems})
 
+    ship = body.ship_to
+    where = (f"Deliver to: {ship.address.strip()}, {ship.city.strip()}, {ship.state.strip()} - {ship.pincode}" if deliver
+             else f"Pick-up at {branch.name}")
     p = _system_principal(branch.id)
     data = InvoiceCreate(
-        company_name=body.name.strip(), address=f"Pick-up at {branch.name}", email=email, contact_person=body.name.strip(),
+        company_name=body.name.strip(), address=where, email=email, contact_person=body.name.strip(),
         contact_phone=body.phone.strip(), invoice_date=_today_ist(), discount_percent=Decimal(0),
         items=[InvoiceItemIn(product_id=l.product_id, quantity=l.quantity) for l in body.items], payments=[],
-        payment_details=("ONLINE ORDER - Paying online (Razorpay)" if body.payment_method == "ONLINE" else "ONLINE ORDER - Pay at pick-up")
+        payment_details=("ONLINE ORDER - Home delivery, paid online (Razorpay)" if deliver else
+                         "ONLINE ORDER - Paying online (Razorpay)" if body.payment_method == "ONLINE" else "ONLINE ORDER - Pay at pick-up")
         + (f" | Note: {body.note.strip()}" if body.note.strip() else ""),
         action="submit")
     try:
-        invoice = services.create_invoice(s, p, data, None)
+        invoice = services.create_invoice(s, p, data, None, [delivery.delivery_line(cfg, quote.charge)] if quote else None)
     except services.Invalid as ex:
         s.rollback()
         raise HTTPException(422, str(ex)) from None
@@ -386,7 +419,10 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
                   customer_id=customer.id if customer else None, customer_name=body.name.strip(), customer_email=email,
                   customer_phone=body.phone.strip(), status="PENDING_PAYMENT" if body.payment_method == "ONLINE" else "PLACED", payment_method=body.payment_method,
                   payment_status="UNPAID", note=body.note.strip(), total=invoice.grand_total,
-                  item_count=sum(i.quantity for i in invoice.items))
+                  item_count=sum(i.quantity for i in invoice.items if i.product_id is not None),
+                  fulfilment=body.fulfilment, courier=cfg.courier if deliver else "",
+                  **({"ship_address": ship.address.strip(), "ship_city": ship.city.strip(), "ship_state": ship.state.strip(),
+                      "ship_pincode": ship.pincode, "weight_grams": quote.weight_grams, "shipping_charge": quote.charge} if deliver else {}))
     s.add(order)
     s.commit()
     if body.payment_method == "ONLINE":

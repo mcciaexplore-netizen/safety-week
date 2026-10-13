@@ -104,13 +104,21 @@ def _email_paid(s: Session, o: Order, p) -> None:
     from .models import Branch  # local: avoids a wider import at module load
 
     b = s.get(Branch, o.branch_id)
-    mailer.send(mailer.Mail(
-        to=o.customer_email, subject=f"Payment received - order {o.number}",
-        text=(f"Hello {o.customer_name},\n\nThank you - we have received your payment of Rs. {o.total} for order {o.number}.\n\n"
-              f"Pick-up branch: {b.name}\n{b.address}\n{('Phone: ' + b.phone) if b.phone else ''}\n\n"
-              f"There is nothing more to pay. We will e-mail you when your order is packed and ready; just show your invoice (attached) at the branch.\n\n"
-              f"Track your order: {settings.store_url}/order/{o.number}\n\nMCCIA"),
-        attachments=attachments))
+    if o.fulfilment == "DELIVERY":
+        from .delivery import read_config
+
+        text = (f"Hello {o.customer_name},\n\nThank you - we have received your payment of Rs. {o.total} for order {o.number}.\n\n"
+                f"We will pack it and hand it to {o.courier or 'the courier'} for delivery to:\n{o.ship_address}, {o.ship_city}, {o.ship_state} - {o.ship_pincode}\n\n"
+                f"Expected delivery: {read_config(s).delivery_days} after dispatch. We will e-mail you the tracking details as soon as it is shipped. "
+                f"Your invoice is attached.\n\nTrack your order: {settings.store_url}/order/{o.number}\n\nMCCIA")
+        subject = f"Payment received - order {o.number} will be delivered"
+    else:
+        text = (f"Hello {o.customer_name},\n\nThank you - we have received your payment of Rs. {o.total} for order {o.number}.\n\n"
+                f"Pick-up branch: {b.name}\n{b.address}\n{('Phone: ' + b.phone) if b.phone else ''}\n\n"
+                f"There is nothing more to pay. We will e-mail you when it is packed and ready; just show your invoice (attached) at the branch.\n\n"
+                f"Track your order: {settings.store_url}/order/{o.number}\n\nMCCIA")
+        subject = f"Payment received - order {o.number}"
+    mailer.send(mailer.Mail(to=o.customer_email, subject=subject, text=text, attachments=attachments))
 
 
 def _confirm_with_razorpay(o: Order, payment_id: str) -> None:

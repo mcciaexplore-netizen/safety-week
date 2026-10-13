@@ -77,12 +77,17 @@ const STATUS: Record<OrderStatus, { label: string; cls: string }> = {
   PENDING_PAYMENT: { label: "Awaiting payment", cls: "border-warning/30 bg-warning/10 text-warning" },
   PLACED: { label: "Order placed", cls: "border-primary/20 bg-primary/10 text-primary" },
   READY: { label: "Ready for pick-up", cls: "border-success/30 bg-success/10 text-success-fg" },
+  SHIPPED: { label: "Shipped", cls: "border-primary/20 bg-primary/10 text-primary" },
+  DELIVERED: { label: "Delivered", cls: "border-success/30 bg-success/10 text-success-fg" },
   PICKED_UP: { label: "Collected", cls: "border-border bg-muted text-muted-foreground" },
   CANCELLED: { label: "Cancelled", cls: "border-danger/20 bg-danger/10 text-danger" },
   EXPIRED: { label: "Released (not collected)", cls: "border-warning/30 bg-warning/10 text-warning" },
 };
-export function OrderStatusPill({ status }: { status: OrderStatus }) {
-  const s = STATUS[status];
+/** `unpaidPickup`: a pay-at-branch order is only a reservation until it is paid for, so it is not called "placed". */
+export function OrderStatusPill({ status, unpaidPickup, delivery }: { status: OrderStatus; unpaidPickup?: boolean; delivery?: boolean }) {
+  const base = STATUS[status];
+  const s = status === "PLACED" && unpaidPickup ? { ...base, label: "Reserved · pay at branch" }
+    : status === "READY" && delivery ? { ...base, label: "Packed · awaiting courier" } : base;
   return <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em]", s.cls)}>{s.label}</span>;
 }
 

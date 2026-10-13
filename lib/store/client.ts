@@ -11,15 +11,23 @@ export interface Product {
 }
 export interface Catalogue {
   open: boolean; event?: string; year?: number; branches: Branch[]; categories: string[]; products: Product[];
-  pickup_hold_days?: number; online_payments?: boolean;
+  pickup_hold_days?: number; online_payments?: boolean; delivery?: { enabled: boolean; days: string };
 }
 export interface Customer { id: string; email: string; name: string; phone: string }
-export type OrderStatus = "PENDING_PAYMENT" | "PLACED" | "READY" | "PICKED_UP" | "CANCELLED" | "EXPIRED";
+export type OrderStatus = "PENDING_PAYMENT" | "PLACED" | "READY" | "SHIPPED" | "DELIVERED" | "PICKED_UP" | "CANCELLED" | "EXPIRED";
+export type Fulfilment = "PICKUP" | "DELIVERY";
+export interface DeliveryInfo {
+  address: string; city: string; state: string; pincode: string; weight_grams: number; charge: string; courier: string; days: string;
+  tracking_no: string; tracking_url: string; shipped_at: string | null; delivered_at: string | null;
+}
+export interface ShipTo { address: string; city: string; state: string; pincode: string }
+export interface DeliveryQuote { available: boolean; reason: string; weight_grams: number; charge: string; gst: string; total: string; days: string }
 export interface Order {
   number: string; status: OrderStatus; payment_method: "PAY_AT_PICKUP" | "ONLINE"; payment_status: "UNPAID" | "PAID" | "REFUNDED";
   paid_at?: string | null; payment?: { key_id: string; razorpay_order_id: string; amount: number; currency: string; pay_until: string } | null;
   branch: Branch; total: string; item_count: number; note: string; created_at: string; ready_at: string | null;
   picked_up_at: string | null; hold_until: string; access_token?: string;
+  fulfilment?: Fulfilment; delivery?: DeliveryInfo | null;
   customer: { name: string; email: string; phone: string };
   items: { name: string; quantity: number; rate: string; amount: string }[];
 }

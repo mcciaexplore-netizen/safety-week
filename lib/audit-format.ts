@@ -75,6 +75,8 @@ export function describeAudit(action: string, m: Meta): AuditDescription {
       return { title: `Moved ${m.quantity} × ${m.product} from ${m.from_branch} to ${m.to_branch}`, lines: m.note ? [`Note: ${m.note}`] : [] };
     case "order.ready": return { title: `Marked online order ${m.order} ready for pick-up (${inv})`, lines: itemLines() };
     case "order.pickup": return { title: `Handed over online order ${m.order} at the counter (${inv})`, lines: itemLines() };
+    case "order.shipped": return { title: `Shipped online order ${m.order} with ${m.courier ?? "the courier"} (${inv})`, lines: [m.tracking_no ? `Consignment number: ${m.tracking_no}` : "", m.tracking_url ? `Tracking link: ${m.tracking_url}` : ""].filter(Boolean) };
+    case "order.delivered": return { title: `Online order ${m.order} was delivered (${inv})`, lines: [] };
     case "order.paid": return { title: `Online order ${m.order} was paid (${inv})`, lines: m.payment ? [`Razorpay payment: ${m.payment}`] : [] };
     case "auth.login": return { title: "Signed in", lines: [] };
     case "user.password_reset": return { title: `Reset the password of ${subject ?? "a user"}`, lines: [] };

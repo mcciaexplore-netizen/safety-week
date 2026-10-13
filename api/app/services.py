@@ -3,6 +3,7 @@ branch rule here (layer 1); PostgreSQL row level security repeats it (layer 2).
 PDF generation lands in Phase 7."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -90,7 +91,19 @@ def _branch_for(s: Session, p: Principal, branch_code: str | None):
     return s.get(repo.Branch, p.branch_id)
 
 
-def _calculate(s: Session, p: Principal, data: InvoiceCreate, event) -> tuple[list[InvoiceItem], dict]:
+@dataclass(frozen=True)
+class ExtraLine:
+    """A charge that is not a catalogue product (courier delivery). Added by the server only; never from a request body."""
+
+    particulars: str
+    hsn_code: str
+    rate: Decimal
+    cgst_rate: Decimal
+    sgst_rate: Decimal
+    quantity: int = 1
+
+
+def _calculate(s: Session, p: Principal, data: InvoiceCreate, event, extra: list[ExtraLine] | None = None) -> tuple[list[InvoiceItem], dict]:
     """The ONLY place amounts are computed. Nothing numeric from the browser is trusted:
     rates and tax come from the catalogue rows and are snapshotted onto the invoice lines."""
     if data.action == "submit" and not any(i.quantity > 0 for i in data.items):
@@ -116,6 +129,13 @@ def _calculate(s: Session, p: Principal, data: InvoiceCreate, event) -> tuple[li
             basic_amount=basic, cgst_rate=prod.cgst_rate, cgst_amount=cgst, sgst_rate=prod.sgst_rate,
             sgst_amount=sgst, total_amount=basic + cgst + sgst, line_order=n,
         ))
+    for line in extra or []:
+        basic = line.quantity * line.rate
+        cgst, sgst = basic * line.cgst_rate / hundred, basic * line.sgst_rate / hundred
+        items.append(InvoiceItem(
+            product_id=None, particulars=line.particulars, hsn_code=line.hsn_code, rate=line.rate, quantity=line.quantity,
+            discount_percent=Decimal(0), rate_after_discount=line.rate, basic_amount=basic, cgst_rate=line.cgst_rate,
+            cgst_amount=cgst, sgst_rate=line.sgst_rate, sgst_amount=sgst, total_amount=basic + cgst + sgst, line_order=len(items) + 1))
     grand = sum((i.total_amount for i in items), Decimal(0))
     rounded = grand.quantize(Decimal(1), rounding=ROUND_HALF_UP)
     totals = dict(
@@ -201,12 +221,13 @@ def _verify_razorpay(s: Session, payments: list[InvoicePayment], invoice_id=None
             verify_reference(s, pay.reference, pay.amount, invoice_id)
 
 
-def create_invoice(s: Session, p: Principal, data: InvoiceCreate, branch_code: str | None = None) -> Invoice:
+def create_invoice(s: Session, p: Principal, data: InvoiceCreate, branch_code: str | None = None,
+                   extra: list[ExtraLine] | None = None) -> Invoice:
     branch = _branch_for(s, p, branch_code)  # branch comes from the account, never the payload
     event = repo.current_event(s)
     if event is None:
         raise Invalid("No active event is configured")
-    items, totals = _calculate(s, p, data, event)
+    items, totals = _calculate(s, p, data, event, extra)
     if data.action == "submit":
         _check_stock(s, branch, event, items)
     new_payments = _build_payments(data, totals["grand_total"])
@@ -233,7 +254,9 @@ def update_invoice(s: Session, p: Principal, invoice_id: uuid.UUID, data: Invoic
     if not was_draft and not p.is_super:  # branch users AND branch admins ask; only the central admin changes a submitted invoice
         raise Forbidden("Only the central admin can change a submitted invoice. Use “Request edit” to ask for the change.")
     event = s.get(repo.Event, invoice.event_id)
-    items, totals = _calculate(s, p, data, event)
+    # a revision keeps any non-product line (delivery) the invoice already has
+    kept = [ExtraLine(i.particulars, i.hsn_code, i.rate, i.cgst_rate, i.sgst_rate, i.quantity) for i in invoice.items if i.product_id is None]
+    items, totals = _calculate(s, p, data, event, kept)
 
     if not (was_draft and data.action != "submit"):  # a submitted invoice or a revision: stock must cover it
         _check_stock(s, s.get(repo.Branch, invoice.branch_id), event, items,

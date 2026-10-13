@@ -4,6 +4,7 @@ Razorpay's servers are replaced by a small stand-in; the signatures are computed
 import hashlib
 import hmac
 import json
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -23,7 +24,7 @@ class FakeRazorpay:
         self.orders, self.payments, self.refunds, self.qrs, self.qr_paid = {}, {}, [], {}, {}
 
     def create_order(self, amount_paise, receipt, notes=None):
-        oid = f"order_T{len(self.orders):04d}"
+        oid = f"order_T{uuid.uuid4().hex[:12]}"  # unique across stand-ins: the database remembers earlier ones
         self.orders[oid] = {"amount": amount_paise, "receipt": receipt, "notes": notes or {}}
         return {"id": oid, "amount": amount_paise}
 

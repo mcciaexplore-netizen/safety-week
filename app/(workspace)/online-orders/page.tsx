@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCheck, PackageCheck, XCircle } from "lucide-react";
+import { CheckCheck, PackageCheck, Truck, XCircle } from "lucide-react";
 import { EditDialog, str } from "@/components/admin/edit-dialog";
 import { PageHeader } from "@/components/app/page-header";
 import { PickupDialog } from "@/components/app/pickup-dialog";
@@ -16,7 +16,7 @@ import { api } from "@/lib/services/api";
 import type { Order } from "@/lib/store/client";
 
 type Row = Order & { id: string };
-const TABS: [string, string][] = [["OPEN", "To prepare / hand over"], ["PENDING_PAYMENT", "Awaiting payment"], ["READY", "Ready for pick-up"], ["PICKED_UP", "Collected"], ["CANCELLED", "Cancelled"], ["EXPIRED", "Released"]];
+const TABS: [string, string][] = [["OPEN", "To prepare / hand over"], ["PENDING_PAYMENT", "Awaiting payment"], ["READY", "Packed / ready"], ["SHIPPED", "Shipped"], ["DELIVERED", "Delivered"], ["PICKED_UP", "Collected"], ["CANCELLED", "Cancelled"], ["EXPIRED", "Released"]];
 const BRANCHES: [string, string][] = [["", "All branches"], ["SBR", "SB Road"], ["TIL", "Tilak Road"], ["BHO", "Bhosari"], ["HAD", "Hadapsar"], ["AHL", "Ahilyanagar"]];
 const SEL = "h-9 rounded-lg border border-input bg-white px-3 text-sm";
 
@@ -25,7 +25,7 @@ export default function OnlineOrdersPage() {
   const role = session?.user.role;
   const [tab, setTab] = useState("OPEN");
   const [branch, setBranch] = useState("");
-  const [dialog, setDialog] = useState<{ kind: "pickup" | "cancel"; order: Row } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "pickup" | "cancel" | "ship"; order: Row } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const list = useAsync(() => {
@@ -38,7 +38,7 @@ export default function OnlineOrdersPage() {
   if (!API_MODE) return <EmptyState title="Available with the live backend" description="Online orders are kept on the server." />;
   const isAdmin = role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
 
-  async function act(o: Row, what: "ready") {
+  async function act(o: Row, what: "ready" | "delivered") {
     setBusy(o.id); setErr(null);
     try { await api(`/store-orders/${o.id}/${what}`, { method: "POST" }); list.reload(); }
     catch (e) { setErr(e instanceof Error ? e.message : "Could not update the order."); }
@@ -48,7 +48,7 @@ export default function OnlineOrdersPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader title="Online orders" description="Orders placed on the MCCIA Store for collection from a branch. Pack them, mark them ready (the customer is e-mailed), and when they collect, record the payment."
+      <PageHeader title="Online orders" description="Orders from the MCCIA Store. Pick-up orders: pack them, mark them ready (the customer is e-mailed) and record the payment when they collect. Delivery orders are already paid: pack them, hand them to the courier and enter the tracking number (the customer is e-mailed the tracking link)."
         actions={role === "SUPER_ADMIN" ? (
           <select aria-label="Branch" className={SEL} value={branch} onChange={(e) => setBranch(e.target.value)}>{BRANCHES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         ) : undefined} />
@@ -66,18 +66,28 @@ export default function OnlineOrdersPage() {
             <tbody className="[&>tr]:border-t [&_td]:px-4 [&_td]:py-3 [&_td]:align-top">
               {list.data.map((o) => (
                 <tr key={o.id} data-testid="online-order-row">
-                  <td><span className="block font-mono font-semibold">{o.number}</span><span className="text-xs text-muted-foreground">{formatDateTime(o.created_at)}</span>{role === "SUPER_ADMIN" && <span className="block text-xs text-muted-foreground">Collect: {o.branch.name}</span>}</td>
-                  <td><span className="block font-medium">{o.customer.name}</span><span className="block text-xs text-muted-foreground">{o.customer.phone}</span><span className="block text-xs text-muted-foreground">{o.customer.email}</span></td>
+                  <td><span className="block font-mono font-semibold">{o.number}</span><span className="text-xs text-muted-foreground">{formatDateTime(o.created_at)}</span>{role === "SUPER_ADMIN" && <span className="block text-xs text-muted-foreground">{o.fulfilment === "DELIVERY" ? "Dispatch" : "Collect"}: {o.branch.name}</span>}</td>
+                  <td><span className="block font-medium">{o.customer.name}</span><span className="block text-xs text-muted-foreground">{o.customer.phone}</span><span className="block text-xs text-muted-foreground">{o.customer.email}</span>
+                    {o.fulfilment === "DELIVERY" && o.delivery && (
+                      <span className="mt-1 block text-xs"><Truck className="mr-1 inline size-3 text-primary" /><strong>Deliver to:</strong> {o.delivery.address}, {o.delivery.city}, {o.delivery.state} - {o.delivery.pincode}<span className="block text-muted-foreground">{(o.delivery.weight_grams / 1000).toFixed(2)} kg · charge {formatRupees(Number(o.delivery.charge))} + GST{o.delivery.tracking_no ? ` · ${o.delivery.courier} ${o.delivery.tracking_no}` : ""}</span></span>
+                    )}</td>
                   <td className="max-w-64"><ul className="space-y-0.5 text-xs">{o.items.map((i) => <li key={i.name}>{i.quantity} × {i.name}</li>)}</ul>{o.note && <p className="mt-1 text-xs italic text-muted-foreground">“{o.note}”</p>}</td>
                   <td className="text-right tabular-nums">{formatRupees(Number(o.total))}</td>
                   <td>{o.payment_status === "PAID" ? <span className="text-xs font-semibold text-success-fg">{o.payment_method === "ONLINE" ? "Paid online" : "Paid"}</span> : o.payment_status === "REFUNDED" ? <span className="text-xs font-semibold text-muted-foreground">Refunded</span> : o.payment_method === "ONLINE" ? <span className="text-xs font-semibold text-warning">Awaiting online payment</span> : <span className="text-xs font-semibold text-warning">Pay at pick-up</span>}</td>
-                  <td><OrderStatusPill status={o.status} /></td>
+                  <td><OrderStatusPill status={o.status} unpaidPickup={o.fulfilment !== "DELIVERY" && o.payment_status === "UNPAID"} delivery={o.fulfilment === "DELIVERY"} /></td>
                   <td>
-                    {(o.status === "PLACED" || o.status === "READY" || o.status === "PENDING_PAYMENT") && (
+                    {(o.status === "PLACED" || o.status === "READY" || o.status === "PENDING_PAYMENT" || o.status === "SHIPPED") && (
                       <div className="flex flex-wrap justify-end gap-2">
-                        {o.status === "PLACED" && <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => act(o, "ready")}><PackageCheck data-icon="inline-start" />Mark ready</Button>}
-                        {o.status !== "PENDING_PAYMENT" && <Button size="sm" onClick={() => setDialog({ kind: "pickup", order: o })}><CheckCheck data-icon="inline-start" />Collected</Button>}
-                        {isAdmin && <Button size="sm" variant="destructive" onClick={() => setDialog({ kind: "cancel", order: o })}><XCircle data-icon="inline-start" />Cancel</Button>}
+                        {o.status === "PLACED" && <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => act(o, "ready")}><PackageCheck data-icon="inline-start" />{o.fulfilment === "DELIVERY" ? "Mark packed" : "Mark ready"}</Button>}
+                        {o.fulfilment === "DELIVERY" ? (
+                          <>
+                            {(o.status === "PLACED" || o.status === "READY") && o.payment_status === "PAID" && <Button size="sm" onClick={() => setDialog({ kind: "ship", order: o })}><Truck data-icon="inline-start" />Ship</Button>}
+                            {o.status === "SHIPPED" && <Button size="sm" disabled={busy === o.id} onClick={() => act(o, "delivered")}><CheckCheck data-icon="inline-start" />Delivered</Button>}
+                          </>
+                        ) : (
+                          o.status !== "PENDING_PAYMENT" && <Button size="sm" onClick={() => setDialog({ kind: "pickup", order: o })}><CheckCheck data-icon="inline-start" />Collected</Button>
+                        )}
+                        {isAdmin && o.status !== "SHIPPED" && <Button size="sm" variant="destructive" onClick={() => setDialog({ kind: "cancel", order: o })}><XCircle data-icon="inline-start" />Cancel</Button>}
                       </div>
                     )}
                   </td>
@@ -88,6 +98,14 @@ export default function OnlineOrdersPage() {
         </div>
       )}
       {dialog?.kind === "pickup" && <PickupDialog key={dialog.order.id} order={dialog.order} onClose={() => setDialog(null)} onDone={() => list.reload()} />}
+      {dialog?.kind === "ship" && (
+        <EditDialog key={`s-${dialog.order.id}`} title={`Ship ${dialog.order.number}`}
+          description={`Enter the ${dialog.order.delivery?.courier || "courier"} consignment (AWB) number. The customer is e-mailed the tracking details and the invoice as soon as you save. Paste the courier's tracking link too, if you have one.`}
+          fields={[{ key: "tracking_no", label: "Consignment / AWB number", wide: true }, { key: "tracking_url", label: "Tracking link (optional, https://…)", wide: true }]}
+          initial={{ tracking_no: "", tracking_url: "" }} submitLabel="Mark shipped and e-mail the customer"
+          onSave={async (v) => { await api(`/store-orders/${dialog.order.id}/ship`, { method: "POST", body: JSON.stringify({ tracking_no: str(v.tracking_no), tracking_url: str(v.tracking_url) }) }); list.reload(); }}
+          onClose={() => setDialog(null)} />
+      )}
       {dialog?.kind === "cancel" && (
         <EditDialog key={`c-${dialog.order.id}`} title={`Cancel ${dialog.order.number}`} description={dialog.order.payment_status === "PAID" ? `The customer paid ${formatRupees(Number(dialog.order.total))} online: the FULL amount is refunded through Razorpay, the items go back into stock and the customer is e-mailed.` : "The items go back into stock and the customer is e-mailed."}
           fields={[{ key: "reason", label: "Reason", wide: true }]} initial={{ reason: "" }} submitLabel={dialog.order.payment_status === "PAID" ? "Cancel and refund" : "Cancel order"}

@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from . import mailer, razorpay, services
+from . import delivery, documents, mailer, razorpay, services
 from . import repositories as repo
 from .admin import COUNTED
 from .auth import Principal, current_principal
@@ -44,11 +44,11 @@ def _row(s: Session, o: Order) -> dict:
 
 
 @router.get("")
-def list_orders(s: Sess, p: Me, status: Annotated[str | None, Query(pattern="^(PENDING_PAYMENT|PLACED|READY|PICKED_UP|CANCELLED|EXPIRED|OPEN)$")] = None,
+def list_orders(s: Sess, p: Me, status: Annotated[str | None, Query(pattern="^(PENDING_PAYMENT|PLACED|READY|SHIPPED|DELIVERED|PICKED_UP|CANCELLED|EXPIRED|OPEN)$")] = None,
                 branch: str | None = None, limit: Annotated[int, Query(ge=1, le=500)] = 200):
     stmt = select(Order).order_by(Order.created_at.desc()).limit(limit)
     if status == "OPEN":
-        stmt = stmt.where(Order.status.in_(("PLACED", "READY")))
+        stmt = stmt.where(Order.status.in_(("PLACED", "READY", "SHIPPED")))
     elif status:
         stmt = stmt.where(Order.status == status)
     if branch:
@@ -70,6 +70,8 @@ def mark_ready(order_id: uuid.UUID, s: Sess, p: Me):
     inv = services.get_invoice(s, p, o.invoice_id)
     services._audit(s, p, inv, "order.ready", order=o.number)
     s.commit()
+    if o.fulfilment == "DELIVERY":  # packed for the courier: the customer hears when it is handed over (see /ship)
+        return _row(s, o)
     branch = s.get(Branch, o.branch_id)
     mailer.send(mailer.Mail(
         to=o.customer_email, subject=f"Order {o.number} is ready for pick-up",
@@ -91,6 +93,8 @@ def mark_picked_up(order_id: uuid.UUID, body: PickupIn, s: Sess, p: Me):
     """The customer collected the goods. If they had not paid yet, the payment taken at the counter is recorded on the
     invoice (a new version: 'Paid at pick-up')."""
     o = _order(s, p, order_id)
+    if o.fulfilment == "DELIVERY":
+        raise HTTPException(409, "This is a home-delivery order: mark it shipped with its tracking number instead")
     if o.status not in ("PLACED", "READY"):
         raise HTTPException(409, "This order is not waiting for pick-up")
     inv: Invoice = services.get_invoice(s, p, o.invoice_id)
@@ -118,6 +122,63 @@ def mark_picked_up(order_id: uuid.UUID, body: PickupIn, s: Sess, p: Me):
     o.status, o.picked_up_at, o.updated_at = "PICKED_UP", now, now
     services._audit(s, p, inv, "order.pickup", order=o.number)
     s.commit()
+    return _row(s, o)
+
+
+class ShipIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tracking_no: str = Field(min_length=3, max_length=60)  # the courier's consignment (AWB) number
+    tracking_url: str = Field(default="", max_length=500, pattern=r"^$|^https://\S+$")
+
+
+@router.post("/{order_id}/ship")
+def mark_shipped(order_id: uuid.UUID, body: ShipIn, s: Sess, p: Me):
+    """Handed to the courier. Only a PAID home-delivery order can be sent; the customer is e-mailed the tracking details
+    (and the invoice) as soon as this is saved."""
+    o = _order(s, p, order_id)
+    if o.fulfilment != "DELIVERY":
+        raise HTTPException(409, "This is a pick-up order")
+    if o.payment_status != "PAID":
+        raise HTTPException(409, "Payment has not been received for this order: it must not be sent")
+    if o.status not in ("PLACED", "READY"):
+        raise HTTPException(409, "This order is not waiting to be shipped")
+    awb = body.tracking_no.strip()
+    cfg = delivery.read_config(s)
+    url = body.tracking_url.strip() or (cfg.tracking_url_template.replace("{awb}", awb) if cfg.tracking_url_template else "")
+    now = datetime.now(UTC)
+    o.status, o.shipped_at, o.updated_at = "SHIPPED", now, now
+    o.tracking_no, o.tracking_url, o.courier = awb, url, o.courier or cfg.courier
+    inv = services.get_invoice(s, p, o.invoice_id)
+    services._audit(s, p, inv, "order.shipped", order=o.number, courier=o.courier, tracking_no=awb, tracking_url=url)
+    s.commit()
+    attachments = []
+    try:
+        data, name = documents.read_document(s, p, o.invoice_id, None)
+        attachments = [(name, data, "application/pdf")]
+    except Exception:
+        pass  # the e-mail still goes; the invoice can be downloaded from the order page
+    track = (f"Track your parcel: {url}\n" if url else "") + f"{o.courier} consignment number: {awb}\n"
+    mailer.send(mailer.Mail(
+        to=o.customer_email, subject=f"Order {o.number} has been shipped",
+        text=(f"Hello {o.customer_name},\n\nYour order {o.number} has been handed to {o.courier} and is on its way to:\n"
+              f"{o.ship_address}, {o.ship_city}, {o.ship_state} - {o.ship_pincode}\n\n{track}"
+              f"Expected delivery: {cfg.delivery_days}.\nYour invoice is attached.\n\n"
+              f"Order page: {settings.store_url}/order/{o.number}\n\nMCCIA"),
+        attachments=attachments))
+    return _row(s, o)
+
+
+@router.post("/{order_id}/delivered")
+def mark_delivered(order_id: uuid.UUID, s: Sess, p: Me):
+    o = _order(s, p, order_id)
+    if o.fulfilment != "DELIVERY" or o.status != "SHIPPED":
+        raise HTTPException(409, "Only a shipped delivery order can be marked delivered")
+    now = datetime.now(UTC)
+    o.status, o.delivered_at, o.updated_at = "DELIVERED", now, now
+    services._audit(s, p, services.get_invoice(s, p, o.invoice_id), "order.delivered", order=o.number)
+    s.commit()
+    mailer.send(mailer.Mail(to=o.customer_email, subject=f"Order {o.number} delivered",
+                            text=f"Hello {o.customer_name},\n\nYour order {o.number} has been delivered. Thank you for shopping with MCCIA.\n\nMCCIA"))
     return _row(s, o)
 
 

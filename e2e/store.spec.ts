@@ -75,7 +75,7 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   // checkout only shows the branch chosen in the cart (it cannot be changed here)
   await expect(page.getByTestId("branch-TIL")).toBeVisible();
   await expect(page.getByTestId("branch-HAD")).toHaveCount(0);
-  await expect(page.getByRole("radio")).toHaveCount(2);                                     // only the two payment choices
+  await expect(page.getByRole("radio")).toHaveCount(1);                                     // without Razorpay keys / delivery set up, only "pay at the branch" is offered
   // go back, pick Hadapsar (which has none), and try to order: the server explains and suggests Tilak Road
   await page.getByTestId("change-branch").click();
   await page.locator("#cart-branch").selectOption("HAD");
@@ -94,15 +94,14 @@ test("online store: browse, pick a branch, order for pick-up; the branch hands i
   await page.getByLabel("Full name").fill("Meera Shopper");
   await page.getByLabel("Mobile number").fill("9822001111");
   await page.getByLabel(/^E-mail/).fill(`meera.${Date.now()}@example.com`);
-  await expect(page.getByText("Pay at pick-up").first()).toBeVisible();
-  await expect(page.getByText("Coming soon")).toBeVisible();
+  await expect(page.getByText("Pay at the branch and pick up").first()).toBeVisible();
   await page.getByTestId("place-order").click();
 
   // the order page
   await expect(page.getByTestId("order-number")).toContainText("NSW27-TIL-");
   const number = (await page.getByTestId("order-number").innerText()).trim();
   await expect(page.getByTestId("order-total")).toHaveText("₹472.00");
-  await expect(page.getByText("Order placed").first()).toBeVisible();
+  await expect(page.getByText("Reserved").first()).toBeVisible();   // pay-at-branch is a reservation until it is paid
   await expect(page.getByText("you pay at the counter")).toBeVisible();
   const [pdf] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download invoice" }).click()]);
   expect(pdf.suggestedFilename()).toBe(`${number}.pdf`);

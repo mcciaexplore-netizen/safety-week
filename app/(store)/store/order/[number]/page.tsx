@@ -3,7 +3,7 @@
 import { Suspense, use, useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Check, Download, Loader2, MapPin, Phone } from "lucide-react";
+import { Check, Download, ExternalLink, Loader2, MapPin, Phone, Truck } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +17,22 @@ const fmt = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "2-dig
 
 function Timeline({ o }: { o: Order }) {
   const unpaid = o.status === "PENDING_PAYMENT";  // reserved only: it is not a placed order until the payment is confirmed
-  const steps = [
-    { label: unpaid ? "Awaiting payment" : "Order placed", at: unpaid ? null : o.created_at, done: !unpaid },
-    { label: "Packed & ready for pick-up", at: o.ready_at, done: !!o.ready_at || o.status === "PICKED_UP" },
-    { label: "Collected", at: o.picked_up_at, done: o.status === "PICKED_UP" },
-  ];
+  const deliver = o.fulfilment === "DELIVERY";
+  const steps = deliver
+    ? [
+        { label: unpaid ? "Awaiting payment" : "Order placed", at: unpaid ? null : o.created_at, done: !unpaid },
+        { label: "Packed for the courier", at: o.ready_at, done: !!o.ready_at || o.status === "SHIPPED" || o.status === "DELIVERED" },
+        { label: "Shipped", at: o.delivery?.shipped_at ?? null, done: o.status === "SHIPPED" || o.status === "DELIVERED" },
+        { label: "Delivered", at: o.delivery?.delivered_at ?? null, done: o.status === "DELIVERED" },
+      ]
+    : [
+        { label: unpaid ? "Awaiting payment" : o.payment_status === "UNPAID" ? "Reserved" : "Order placed", at: unpaid ? null : o.created_at, done: !unpaid },
+        { label: "Packed & ready for pick-up", at: o.ready_at, done: !!o.ready_at || o.status === "PICKED_UP" },
+        { label: "Collected", at: o.picked_up_at, done: o.status === "PICKED_UP" },
+      ];
   if (o.status === "CANCELLED" || o.status === "EXPIRED") return null;
   return (
-    <ol className="grid gap-4 sm:grid-cols-3" aria-label="Order progress">
+    <ol className={cn("grid gap-4", deliver ? "sm:grid-cols-4" : "sm:grid-cols-3")} aria-label="Order progress">
       {steps.map((s) => (
         <li key={s.label} className="flex items-start gap-3">
           <span className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border text-white", s.done ? "border-success bg-success" : "border-border bg-white text-transparent")}><Check className="size-3.5" /></span>
@@ -98,18 +106,19 @@ function OrderView({ number }: { number: string }) {
   if (error && !order) return <ErrorState title="We could not find that order" message={error} onRetry={() => setNonce((n) => n + 1)} />;
   if (!order) return <Skeleton className="h-64" />;
   const o = order;
-  const open = o.status === "PLACED" || o.status === "READY";
+  const deliver = o.fulfilment === "DELIVERY";
+  const open = (o.status === "PLACED" || o.status === "READY") && !deliver;
   const awaiting = o.status === "PENDING_PAYMENT";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="label-xs">{params.get("t") && o.status === "PLACED" ? "Thank you — your order is placed" : "Order"}</p>
+          <p className="label-xs">{params.get("t") && o.status === "PLACED" ? (o.payment_status === "PAID" ? "Thank you — your order is placed" : "Thank you — your order is reserved") : "Order"}</p>
           <h1 className="mt-1 font-mono text-2xl font-bold" data-testid="order-number">{o.number}</h1>
-          <p className="text-sm text-muted-foreground">{awaiting ? "Started" : "Placed"} {fmt(o.created_at)}</p>
+          <p className="text-sm text-muted-foreground">{awaiting ? "Started" : o.payment_status === "UNPAID" && o.fulfilment !== "DELIVERY" ? "Reserved" : "Placed"} {fmt(o.created_at)}</p>
         </div>
-        <OrderStatusPill status={o.status} />
+        <OrderStatusPill status={o.status} unpaidPickup={o.fulfilment !== "DELIVERY" && o.payment_status === "UNPAID"} delivery={o.fulfilment === "DELIVERY"} />
       </div>
 
       <Timeline o={o} />
@@ -120,6 +129,18 @@ function OrderView({ number }: { number: string }) {
           <Button onClick={payNow} disabled={busy === "pay"} data-testid="pay-now">
             {busy === "pay" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}Pay {rupees(o.total)} now
           </Button>
+        </div>
+      )}
+      {deliver && (o.status === "PLACED" || o.status === "READY") && (
+        <div className="highlight-box text-sm" data-testid="delivery-status">
+          Your payment is received. We are packing your order and handing it to {o.delivery?.courier || "the courier"} — expected delivery {o.delivery?.days || "in 2-3 working days"} after dispatch. We will e-mail you the tracking details.
+        </div>
+      )}
+      {deliver && (o.status === "SHIPPED" || o.status === "DELIVERED") && (
+        <div className="highlight-box space-y-2 text-sm" data-testid="tracking-box">
+          <p className="flex items-center gap-2 font-semibold"><Truck className="size-4 text-primary" />{o.status === "DELIVERED" ? "Delivered" : `On its way with ${o.delivery?.courier || "the courier"}`}</p>
+          {o.delivery?.tracking_no && <p>Consignment number: <span className="font-mono font-semibold">{o.delivery.tracking_no}</span></p>}
+          {o.delivery?.tracking_url && <a href={o.delivery.tracking_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary underline">Track your parcel<ExternalLink className="size-3.5" /></a>}
         </div>
       )}
       {open && (
@@ -142,9 +163,19 @@ function OrderView({ number }: { number: string }) {
           <p className="mt-1 text-xs text-muted-foreground">{o.payment_method === "PAY_AT_PICKUP" ? "Payment: pay at pick-up" : "Payment: online (Razorpay)"} · {o.payment_status === "PAID" ? "Paid" : o.payment_status === "REFUNDED" ? "Refunded" : "Not yet paid"}</p>
         </section>
         <aside className="glass space-y-3 rounded-xl p-5 text-sm">
-          <h2 className="text-lg">Pick-up branch</h2>
-          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" /><span><strong>{o.branch.name}</strong><br />{o.branch.address}</span></p>
-          {o.branch.phone && <p className="flex gap-2"><Phone className="size-4 text-primary" />{o.branch.phone}</p>}
+          {deliver && o.delivery ? (
+            <>
+              <h2 className="text-lg">Delivery address</h2>
+              <p className="flex gap-2" data-testid="delivery-address-view"><Truck className="mt-0.5 size-4 shrink-0 text-primary" /><span><strong>{o.customer.name}</strong><br />{o.delivery.address}<br />{o.delivery.city}, {o.delivery.state} - {o.delivery.pincode}</span></p>
+              <p className="text-xs text-muted-foreground">Parcel weight {(o.delivery.weight_grams / 1000).toFixed(2)} kg · delivery charge {rupees(o.delivery.charge)} + GST</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg">Pick-up branch</h2>
+              <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" /><span><strong>{o.branch.name}</strong><br />{o.branch.address}</span></p>
+              {o.branch.phone && <p className="flex gap-2"><Phone className="size-4 text-primary" />{o.branch.phone}</p>}
+            </>
+          )}
           <Button variant="outline" className="w-full" onClick={invoice} disabled={busy === "pdf"}>
             {busy === "pdf" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Download data-icon="inline-start" />}Download invoice
           </Button>

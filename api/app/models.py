@@ -127,6 +127,7 @@ class Product(Base):
     __table_args__ = (
         UniqueConstraint("event_id", "sku"),
         CheckConstraint("current_rate >= 0", name="ck_products_rate"),
+        CheckConstraint("weight_grams >= 0", name="ck_products_weight"),
         Index("uq_products_event_slug", "event_id", "slug", unique=True),
     )
     id: Mapped[uuid.UUID] = pk()
@@ -150,6 +151,7 @@ class Product(Base):
     image_url: Mapped[str] = mapped_column(String(500), server_default="")
     online_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     best_seller: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    weight_grams: Mapped[int] = mapped_column(Integer, server_default="0")  # packed weight of ONE unit, for delivery charges
 
 
 class DiscountRule(Base):
@@ -439,7 +441,9 @@ class Order(Base):
 
     __tablename__ = "orders"
     __table_args__ = (
-        CheckConstraint("status IN ('PENDING_PAYMENT', 'PLACED', 'READY', 'PICKED_UP', 'CANCELLED', 'EXPIRED')", name="ck_orders_status"),
+        CheckConstraint("status IN ('PENDING_PAYMENT', 'PLACED', 'READY', 'SHIPPED', 'DELIVERED', 'PICKED_UP', 'CANCELLED', 'EXPIRED')", name="ck_orders_status"),
+        CheckConstraint("fulfilment IN ('PICKUP', 'DELIVERY')", name="ck_orders_fulfilment"),
+        CheckConstraint("fulfilment = 'PICKUP' OR payment_method = 'ONLINE'", name="ck_orders_delivery_paid_online"),
         CheckConstraint("payment_method IN ('PAY_AT_PICKUP', 'ONLINE')", name="ck_orders_payment_method"),
         CheckConstraint("payment_status IN ('UNPAID', 'PAID', 'REFUNDED')", name="ck_orders_payment_status"),
         Index("uq_orders_razorpay_order", "razorpay_order_id", unique=True),
@@ -470,3 +474,16 @@ class Order(Base):
     razorpay_payment_id: Mapped[str | None] = mapped_column(String(40))
     razorpay_refund_id: Mapped[str | None] = mapped_column(String(40))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # home delivery by courier (DTDC): the address, the weight the charge was worked out from, and the tracking details
+    fulfilment: Mapped[str] = mapped_column(String(8), server_default="PICKUP")
+    ship_address: Mapped[str] = mapped_column(Text, server_default="")
+    ship_city: Mapped[str] = mapped_column(String(100), server_default="")
+    ship_state: Mapped[str] = mapped_column(String(100), server_default="")
+    ship_pincode: Mapped[str] = mapped_column(String(10), server_default="")
+    weight_grams: Mapped[int] = mapped_column(Integer, server_default="0")
+    shipping_charge: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0")  # before GST; the invoice carries the GST
+    courier: Mapped[str] = mapped_column(String(30), server_default="")
+    tracking_no: Mapped[str] = mapped_column(String(60), server_default="")
+    tracking_url: Mapped[str] = mapped_column(String(500), server_default="")
+    shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
