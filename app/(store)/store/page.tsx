@@ -6,7 +6,7 @@ import { ShoppingCart, Star } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, ProductLink, StockNote } from "@/components/store/bits";
+import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, ProductLink, StockNote, WeightLine } from "@/components/store/bits";
 import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
 import { setQtyChecked, storeActions, useCatalogue, useStore, type Availability, type Branch, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
@@ -115,6 +115,7 @@ function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Br
         <h3 className="mt-1 line-clamp-2 min-h-[2.5rem] font-heading text-base leading-snug font-bold">{p.name}</h3>
       </ProductLink>
       <PriceBlock product={p} className="mt-2" />
+      <WeightLine product={p} className="mt-1" />
       <StockNote product={p} branch={branch} />
       {needBranch && <ChooseBranchFirst className="mt-3" branches={branches} onPick={(c) => { storeActions.setBranch(c); void add(c); }} />}
       {info && <AvailabilityNotice className="mt-3" info={info} branchName={branchName} onSwitch={(c) => { storeActions.setBranch(c); setInfo(null); void add(c, info.wanted - inCart); }} />}

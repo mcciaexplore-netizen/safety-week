@@ -1098,7 +1098,7 @@ A phase is done when:
 
 ### Overall
 
-`PLANNING + UI-FIRST BUILD START`
+`LIVE (go-live branch on Vercel + Neon) - HARDENING / UAT`  (status updated 2026-10-14; the phase lines below are the original 2026-09-30 record, see the change log for everything built since)
 
 ### Source references received
 
@@ -1130,17 +1130,24 @@ A phase is done when:
 - **PHASE 7 — Exact preview + PDF generation: DONE (2026-09-30).** One template (`InvoicePaper`) feeds the live preview, the read-only view, print, and the stored PDF. 44 API/DB/PDF tests, 7 mock-mode + 1 real-stack browser tests pass; typecheck/lint/build clean.
 - **Versioning + audit trail (Prompt 08): DONE (2026-09-30).** 55 API/DB/PDF tests, 7 demo-mode browser tests and the real-stack browser journey pass; typecheck/lint/build clean.
 - **Admin panel (Prompt 09): DONE (2026-09-30).** Central-admin pages: Overview, Branches, Users, Invoices, Products, Event configuration (+ invoice header/footer), Discounts and packages, Reports, Audit logs. 74 API/DB/PDF tests, 7 demo-mode browser tests, and real-stack browser journeys for the branch flow and the admin flow pass; typecheck/lint/build clean.
-- Remaining PLAN phases: hardening, deployment/UAT (owner: Supabase + hosting steps in docs/setup-supabase.md).
+- **Deployment (Phase 10, partly done 2026-10-06):** website `nsw-web` + API `nsw-api` on Vercel, database on Neon (Singapore), migrations at `0016`. Supabase was removed (own sign-in). Razorpay is on live keys. The online store is open.
+- Remaining PLAN phases: hardening (Phase 9) and the rest of deployment/UAT (Phase 10) - see "Next action".
 
-### Next action
+### Next action (2026-10-14)
 
-Owner: create the Supabase project and users (`docs/setup-supabase.md`) - deferred to the end by the project owner. Next build phase: hardening. Execute the next prompt (Phase 3 polish / Phase 4 backend as directed by the project owner). Open questions in `docs/invoice-spec.md` §10 (esp. Q3 discount policy, Q5 rounding, Q7 page count) should be answered by MCCIA in parallel.
+Owner / open items:
+1. **Delivery (on hold, owner to confirm):** set each product's packed weight (Admin > Products) and the price list (Admin > Delivery), then switch it on. It is a price list + manual tracking number; there is NO live DTDC/aggregator API booking.
+2. **Product photos (on hold).**
+3. **Clear the test data** before launch with `api/app/purge_test_data.py` (dry run by default; take a Neon restore point first). Stock needs no reset: remaining stock = opening stock + received - sent - invoiced, so deleting the invoices restores it.
+4. **Hardening:** rotate the Neon password (it was shared in a chat), Neon scale-to-zero off + point-in-time restore, Turnstile bot check and edge rate limits on the public store, a restricted database role for the public router, error monitoring/log alerts, full test run (pytest + Playwright), accessibility pass, five-branch UAT, custom domain, handover.
+5. **MCCIA to answer** the open questions in `docs/invoice-spec.md` §10 (Q3 discount policy - capped at 10% for now -, Q5 rounding at .50, Q7 page count).
+6. Replace the five branch seal images in `public/brand/seals/` if not done.
 
 ---
 
 # 27A. Online Store (pick-up only)
 
-**Status: BUILT except online payment.** Full plan and status: [`docs/online-store-plan.md`](docs/online-store-plan.md).
+**Status (2026-10-14): LIVE. Online payment (Razorpay, live keys) and courier delivery are built; delivery is switched off until the owner confirms its price list.** Full plan and status: [`docs/online-store-plan.md`](docs/online-store-plan.md).
 
 A public shop at `/store` in the same website: visitors browse the materials, see **stock at each of the five branches**, add to cart, choose the **branch to collect from** (no delivery, no couriers) and pay **at pick-up** (cash/UPI/card at the counter; Razorpay online payment is the last phase and shows as "coming soon"). Prices show the shelf price with the GST-inclusive price in brackets underneath. Sign-in is optional: guest checkout, or a 6-digit e-mail code.
 
@@ -1335,3 +1342,15 @@ An order is created as an ordinary SUBMITTED invoice of the pick-up branch (stoc
 - **Counter (staff):** the payment choice on the proforma form and the branch hand-over dialog is now only **Cash** or **Razorpay UPI**. Razorpay UPI shows a single-use UPI QR for the exact amount (`POST /api/v1/payments/razorpay-qr`, status polled every 3 s) and fills in the Razorpay payment id when the customer has paid. The server then ACCEPTS a Razorpay payment on a submitted invoice or a hand-over only if Razorpay confirms it (captured, exact amount, not already used on another invoice - `counter_pay.verify_reference`). When no keys are set (development/tests) the reference stays a plain typed field. Code `api/app/counter_pay.py`, `components/app/razorpay-collect.tsx`, `components/app/pickup-dialog.tsx`.
 - **Keys:** `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` on the API project (test keys now; swap for live keys at launch and add a LIVE-mode webhook with its own secret).
 - **Tests:** 130 API tests (fake Razorpay stand-in, signature maths as Razorpay does it); real test-mode checks: orders and UPI QRs created on Razorpay's test server, checkout window opens with the right amount, the form shows the QR (`e2e/razorpay-counter.spec.ts`, needs `RAZORPAY_E2E=1`).
+
+## 2026-10-09 to 2026-10-14 — Counter payments, edit requests, delivery, admin overview, go-live fix
+
+- **Checkout / payments:** store checkout is now three ways: pay at branch, pay online and pick up, pay online and get it delivered. Counter payment uses Razorpay's own checkout window (the QR Codes API was dropped), prefilled with the customer's name, e-mail and mobile; the MCCIA logo shows in the window. The order page says "Order placed" only once payment is confirmed. A shopper's mobile number is required when a proforma is submitted. Razorpay is on live keys.
+- **Payment Desk integration:** official Cash Receipts are written into the existing Payment Desk database (`PAYMENT_DESK_DATABASE_URL`, server-only secret; `api/app/payment_desk_cash_receipts.py`); the receipt opens directly after a cash invoice is submitted.
+- **Edit control (migration `0015`):** edits to submitted invoices are central-admin-only; branches send an **edit request** that the central admin approves or declines; the invoice date is locked; QR/Razorpay payment status shows on the invoice.
+- **Delivery (migration `0016`):** `products.weight_grams`; order columns for address, weight, delivery charge, courier, tracking number/URL, shipped/delivered times; order statuses `SHIPPED` and `DELIVERED`. The charge comes from the admin's price list (weight slabs, extra per kg, packing weight, GST on the charge, delivery days) in **Admin > Delivery** (`api/app/delivery.py`). It is added to the invoice as a "Delivery charges" line and paid in the same online payment; a home delivery can never be pay-at-pick-up. Staff book the courier themselves and enter the tracking number (`/store-orders/{id}/ship`, `/delivered`); the customer is e-mailed. **There is no live DTDC/aggregator API integration.**
+- **Ways of ordering on/off:** the central admin can switch pay-at-branch, online-and-pick-up and delivery on or off. What a shopper sees is "switched on AND possible" (online needs Razorpay, delivery needs a price list and weights).
+- **Admin:** Overview shows basic income (before GST), GST collected and stock value, per branch and in total; the audit log shows plain-language entries with names, quantities and before/after values; the low-stock card works for the central admin across all branches; the sidebar menu scrolls with Switch branch / Sign out always visible; bulk download of invoices by date range as Excel or a PDF ZIP; the proforma discount is capped at 10%.
+- **Store behaviour:** stock is checked at checkout (no per-line limits, no stock numbers shown to shoppers); the cart keeps one pick-up branch; "Enquire now" call button.
+- **Go-live incident (2026-10-14):** the store showed a browser "CORS error". Cause: the Neon database was still at migration `0015` while the deployed API (commit `4782668`) selects `products.weight_grams`, so every query reading products (`/products`, `/store/catalogue`) returned HTTP 500; an unhandled 500 carries no CORS header, so the browser reports it as CORS. CORS itself was correct. Fix: `alembic upgrade head` on the Neon direct connection (now at `0016`). **Lesson: run migrations BEFORE deploying an API that needs them** (`docs/deploy.md` step 2).
+- **Test data:** `api/app/purge_test_data.py` (dry run by default; `--before YYYY-MM-DD`, `--delete --confirm "DELETE TEST DATA"`) removes test invoices with their lines, payments, versions, PDFs, edit requests and online orders, and restarts numbering only where no invoice remains. Stock is never stored, so deleting invoices restores it. Take a Neon restore point first.

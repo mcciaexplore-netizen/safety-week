@@ -24,6 +24,11 @@ $env:DATABASE_URL = "<DIRECT string>"
 ```
 Run `alembic upgrade head` again whenever a new release adds a migration — **before** deploying the API that needs it. Everyone else is added from the **Users** page.
 
+> If you skip this, the API deploys fine and `/health` stays green, but every query touching the new column fails with HTTP 500. The browser then shows a misleading "blocked by CORS policy" error (a crashed response has no CORS header). Real incident, 2026-10-14: migration `0016` (delivery weights) was missing, so `/products` and `/store/catalogue` returned 500. Check with `alembic current` (it must print the newest revision) and `curl https://YOUR-API/api/v1/products`.
+
+### Clearing test data before launch
+`python -m app.purge_test_data --before YYYY-MM-DD` shows what would be removed (dry run); add `--delete --confirm "DELETE TEST DATA"` to do it. Take a Neon restore point first. Stock is computed from invoices, so deleting them gives the stock back.
+
 ## 3. API project (`nsw-api`)
 ```
 cd api
@@ -42,6 +47,7 @@ Environment variables (Production), e.g. `vercel env add NAME production`:
 | `EMAIL_BACKEND` | `smtp` (Gmail app password) or `resend` — needed for sign-in codes and order e-mails |
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (or `RESEND_API_KEY`) | your mail account |
 | `STORE_URL` | `https://YOUR-SITE/store` (links in e-mails) |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | live keys for online and counter payments; the webhook (`/api/v1/store/webhooks/razorpay`) must be created in the same mode (live/test) as the keys |
 | `CRON_SECRET` | random string; the daily job that frees uncollected orders uses it |
 
 Then `vercel deploy --prod`. The API refuses to start in production if the secret is short, `DEV_LOGIN` is on,

@@ -51,6 +51,12 @@ def test_charge_is_worked_out_from_the_weight(client, people, prods, delivery_on
     assert quote(client, prods, 1, other)["available"] is False   # a product without a weight cannot be delivered
 
 
+def test_shoppers_see_each_products_packed_weight(client, people, prods, delivery_on):
+    shown = {p["name"]: p["weight_grams"] for p in client.get(f"{S}/catalogue").json()["products"]}
+    assert shown[POSTER] == 250                                    # set by the admin, shown on the store card
+    assert 0 in shown.values()                                     # not set yet -> 0, the store shows no weight line
+
+
 def test_delivery_rules_are_enforced_by_the_server(client, people, prods, delivery_on):
     stock_for(client, people, prods, "TIL", POSTER, 10)
     no_address = {k: v for k, v in deliver_body(prods).items() if k != "ship_to"}

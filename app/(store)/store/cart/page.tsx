@@ -6,7 +6,7 @@ import { ShoppingBag, Trash2 } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BranchSelect, ProductImage, QtyStepper } from "@/components/store/bits";
+import { BranchSelect, ProductImage, QtyStepper, WeightLine } from "@/components/store/bits";
 import { useEffect, useState } from "react";
 import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
 import { cartLines, cartTotals, checkAvailability, gstPrice, rupees, setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
@@ -70,6 +70,7 @@ export default function CartPage() {
               <div className="min-w-0 flex-1">
                 <Link href={`/store/p/${p.slug}`} className="font-heading font-bold hover:text-primary">{p.name}</Link>
                 <p className="text-sm">{rupees(p.rate)} <span className="text-xs text-muted-foreground">({rupees(gstPrice(p))} incl. GST)</span></p>
+                <WeightLine product={p} />
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <QtyStepper value={qty} onChange={(n) => void change(p.id, n, qty)} label={`Quantity of ${p.name}`} />
                   <button type="button" onClick={() => storeActions.setQty(p.id, 0)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-danger" aria-label={`Remove ${p.name}`}>

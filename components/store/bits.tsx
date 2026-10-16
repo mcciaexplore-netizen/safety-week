@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BookOpen, Flag, Gift, Image as ImageIcon, Minus, Plus, ScrollText, Shield, Shirt, Star } from "lucide-react";
-import { gstPrice, rupees, type Branch, type OrderStatus, type Product } from "@/lib/store/client";
+import { formatWeight, gstPrice, rupees, type Branch, type OrderStatus, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICON: Record<string, typeof Shield> = {
@@ -45,6 +45,12 @@ export function PriceBlock({ product, size = "md", className }: { product: Produ
       <p className={cn("text-muted-foreground", size === "lg" ? "text-sm" : "text-xs")}>({rupees(gstPrice(product))} incl. GST)</p>
     </div>
   );
+}
+
+/** Packed weight of one unit, so shoppers can see what a home delivery will weigh. Nothing is shown until the admin has set it. */
+export function WeightLine({ product, className }: { product: Pick<Product, "weight_grams" | "unit">; className?: string }) {
+  if (!product.weight_grams || product.weight_grams <= 0) return null;
+  return <p className={cn("text-xs text-muted-foreground", className)}>Weight: {formatWeight(product.weight_grams)} per {product.unit.replace(/\.$/, "").toLowerCase() === "nos" ? "piece" : product.unit}</p>;
 }
 
 /** Availability at the shopper's chosen branch. */

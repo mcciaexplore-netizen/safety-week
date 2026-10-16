@@ -7,7 +7,7 @@ import { API_URL } from "@/lib/services/api";
 export interface Branch { code: string; name: string; address: string; phone: string }
 export interface Product {
   id: string; slug: string; name: string; category: string; image_url: string; best_seller: boolean; unit: string; hsn_code: string;
-  rate: string; gst_percent: string; price_incl_gst: string; stock_status: Record<string, "OK" | "LOW" | "OUT">;
+  weight_grams?: number; rate: string; gst_percent: string; price_incl_gst: string; stock_status: Record<string, "OK" | "LOW" | "OUT">;
 }
 export interface Catalogue {
   open: boolean; event?: string; year?: number; branches: Branch[]; categories: string[]; products: Product[];
@@ -40,6 +40,9 @@ export const ENQUIRY_PHONE_SPACED = "98221 85995";
 export const rupees = (n: number | string) =>
   `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const gstPrice = (p: Product) => Number(p.price_incl_gst);
+
+/** "250 g" under a kilo, "1.25 kg" from a kilo up. */
+export const formatWeight = (grams: number) => (grams >= 1000 ? `${(grams / 1000).toFixed(2).replace(/\.?0+$/, "")} kg` : `${grams} g`);
 
 /* ---------- API ---------- */
 export class StoreError extends Error {

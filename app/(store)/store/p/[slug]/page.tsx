@@ -6,7 +6,7 @@ import { ArrowLeft, Check, ShoppingCart } from "lucide-react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockNote } from "@/components/store/bits";
+import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockNote, WeightLine } from "@/components/store/bits";
 import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
 import { setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
 
@@ -53,6 +53,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
           <h1 className="mt-2 text-[clamp(1.8rem,3.5vw,2.5rem)] font-extrabold">{p.name}</h1>
           <PriceBlock product={p} size="lg" className="mt-4" />
           <p className="mt-1 text-xs text-muted-foreground">Price per {p.unit.toLowerCase()} · HSN {p.hsn_code} · GST {Number(p.gst_percent)}%</p>
+          <WeightLine product={p} className="mt-1" />
 
           <div className="mt-6 space-y-3 rounded-xl border bg-white/60 p-4">
             <label className="flex flex-wrap items-center gap-2 text-sm">Collect from

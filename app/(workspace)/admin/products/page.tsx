@@ -28,7 +28,7 @@ const FIELDS: FieldSpec[] = [
   { key: "description", label: "Description", type: "textarea" },
   { key: "category", label: "Online store category", hint: "Groups the product in the store, e.g. T-Shirts." },
   { key: "image_url", label: "Photo web address (https://…)", hint: "Shown in the online store. Leave blank for a placeholder.", wide: true },
-  { key: "weight_grams", label: "Packed weight of one unit (grams)", type: "number", step: "1", hint: "Used to work out the delivery charge. Leave 0 if it cannot be delivered." },
+  { key: "weight_grams", label: "Packed weight of one unit (grams)", type: "number", step: "1", hint: "Shown to shoppers in the store and used to work out the delivery charge. Leave 0 if it cannot be delivered." },
   { key: "online_enabled", label: "Show in the online store", type: "checkbox" },
   { key: "best_seller", label: "Tag as a best seller in the store", type: "checkbox" },
   { key: "active", label: "Available on new invoices", type: "checkbox" },
@@ -65,12 +65,13 @@ export default function ProductsPage() {
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : !list.data ? <LoadingRows rows={8} /> : (
         <div className="overflow-x-auto rounded-xl glass shadow-card">
           <table className="w-full text-sm">
-            <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>#</th><th>Particulars</th><th>HSN</th><th className="text-right">Rate</th><th className="text-right">CGST+SGST</th><th>Rate status</th><th /></tr></thead>
+            <thead className="bg-secondary/60 text-left"><tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium"><th>#</th><th>Particulars</th><th>HSN</th><th className="text-right">Rate</th><th className="text-right">CGST+SGST</th><th className="text-right">Weight</th><th>Rate status</th><th /></tr></thead>
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">
               {shown.map((x) => (
                 <tr key={x.id} data-testid="product-row" className={x.active ? "" : "opacity-60"}>
                   <td className="text-muted-foreground">{x.line_order}</td><td className="font-medium">{x.name.replace(/\s+/g, " ")}{!x.active && <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>}<ProductStockFlag alerts={(alerts.data?.items ?? []).filter((a) => a.product_id === x.id)} /></td>
                   <td className="font-mono">{x.hsn_code}</td><td className="text-right tabular-nums">{formatMoney(Number(x.current_rate))}</td><td className="text-right">{Number(x.cgst_rate)}% + {Number(x.sgst_rate)}%</td>
+                  <td className="text-right tabular-nums">{x.weight_grams ? `${x.weight_grams} g` : <span className="text-xs text-warning" title="No weight set: this product cannot be home-delivered">not set</span>}</td>
                   <td>{x.rate_confirmed ? <Badge variant="outline" className="bg-success/10 text-success-fg">Confirmed</Badge> : <Badge variant="outline" className="bg-warning/10 text-warning">2026 reference</Badge>}</td>
                   <td className="text-right"><Button variant="outline" size="icon-sm" aria-label={`Edit ${x.name}`} onClick={() => setEditing(x)}><Pencil /></Button></td>
                 </tr>
