@@ -28,7 +28,7 @@ const FIELDS: FieldSpec[] = [
   { key: "description", label: "Description", type: "textarea" },
   { key: "category", label: "Online store category", hint: "Groups the product in the store, e.g. T-Shirts." },
   { key: "image_url", label: "Photo web address (https://…)", hint: "Shown in the online store. Leave blank for a placeholder.", wide: true },
-  { key: "weight_grams", label: "Packed weight of one unit (grams)", type: "number", step: "1", hint: "Shown to shoppers in the store and used to work out the delivery charge. Leave 0 if it cannot be delivered." },
+  { key: "weight_grams", label: "Packed weight of one sold unit (grams)", type: "number", step: "1", hint: "Shown to shoppers and used for the delivery charge. For a product sold in packs, enter the weight of the WHOLE pack (badges: 118 for the 50). Leave 0 if it cannot be delivered." },
   { key: "pack_size", label: "Sold in packs of (units)", type: "number", step: "1", hint: "1 = sold singly. Badges: 50, so 1 selected in the store means 50 units, priced for 50 and taken from stock as 50." },
   { key: "online_enabled", label: "Show in the online store", type: "checkbox" },
   { key: "best_seller", label: "Tag as a best seller in the store", type: "checkbox" },

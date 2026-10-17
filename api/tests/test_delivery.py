@@ -72,6 +72,17 @@ def test_bundle_products_are_sold_in_whole_packs(client, people, prods):
             c.execute(text("update products set pack_size = 1"))
 
 
+def test_a_packs_weight_is_for_the_whole_pack(client, people, prods, delivery_on):
+    with engine.begin() as c:
+        c.execute(text("update products set pack_size = 50, weight_grams = 118 where name like :n"), {"n": f"{POSTER}%"})
+    try:
+        assert quote(client, prods, 50)["weight_grams"] == 118 + 100      # one pack of 50 badges = 118 g, plus 100 g packing
+        assert quote(client, prods, 100)["weight_grams"] == 236 + 100     # two packs
+    finally:
+        with engine.begin() as c:
+            c.execute(text("update products set pack_size = 1"))
+
+
 def test_delivery_rules_are_enforced_by_the_server(client, people, prods, delivery_on):
     stock_for(client, people, prods, "TIL", POSTER, 10)
     no_address = {k: v for k, v in deliver_body(prods).items() if k != "ship_to"}

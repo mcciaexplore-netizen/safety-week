@@ -52,7 +52,7 @@ export function PriceBlock({ product, size = "md", className }: { product: Produ
 export function WeightLine({ product, className }: { product: Pick<Product, "weight_grams" | "unit" | "pack_size">; className?: string }) {
   if (!product.weight_grams || product.weight_grams <= 0) return null;
   const n = packOf(product);
-  return <p className={cn("text-xs text-muted-foreground", className)}>Weight: {formatWeight(product.weight_grams * n)} {n > 1 ? `per pack of ${n}` : `per ${product.unit.replace(/\.$/, "").toLowerCase() === "nos" ? "piece" : product.unit}`}</p>;
+  return <p className={cn("text-xs text-muted-foreground", className)}>Weight: {formatWeight(product.weight_grams)} {n > 1 ? `per pack of ${n}` : `per ${product.unit.replace(/\.$/, "").toLowerCase() === "nos" ? "piece" : product.unit}`}</p>;
 }
 
 /** Availability at the shopper's chosen branch. */

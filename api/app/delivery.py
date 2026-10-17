@@ -3,7 +3,8 @@
 Nothing here is guessed. The central admin sets the price list (weight slabs, extra per kg, packing weight, GST) in the
 admin screen, and each product's packed weight on its own row. Until that is done, delivery is simply not offered.
 
-  weight   = sum(unit weight x quantity) + packing weight
+  weight   = sum(weight of one sold unit x units ordered) + packing weight
+             (a product sold in packs, e.g. badges x 50, carries the weight of the WHOLE pack: 118 g per 50 badges)
   charge   = the slab the weight falls in; above the last slab: last slab + extra_per_kg for every started kg beyond it
   GST      = added on top of the charge (the invoice shows it as CGST + SGST on a "Delivery charges" line)
 
@@ -128,7 +129,7 @@ def quote(cfg: DeliveryConfig, products: dict, lines: list[tuple[uuid.UUID, int]
             return Quote(available=False, reason="One of the products is no longer available.")
         if pr.weight_grams <= 0:
             return Quote(available=False, reason=f"Home delivery is not available for {' '.join(pr.name.split())} yet. You can collect it from a branch.")
-        grams += pr.weight_grams * qty
+        grams += math.ceil(pr.weight_grams * qty / pr.pack_size)  # weight_grams is for ONE sold unit: a whole pack when the product is sold in packs
     if cfg.max_weight_grams and grams > cfg.max_weight_grams:
         return Quote(available=False, reason="This order is too heavy for home delivery. Please collect it from a branch or split it into smaller orders.", weight_grams=grams)
     base = charge_for(cfg, grams).quantize(Decimal("0.01"), ROUND_HALF_UP)

@@ -152,7 +152,7 @@ class Product(Base):
     image_url: Mapped[str] = mapped_column(String(500), server_default="")
     online_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     best_seller: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    weight_grams: Mapped[int] = mapped_column(Integer, server_default="0")  # packed weight of ONE unit, for delivery charges
+    weight_grams: Mapped[int] = mapped_column(Integer, server_default="0")  # packed weight of ONE SOLD unit (the whole pack when pack_size > 1), for delivery charges
     pack_size: Mapped[int] = mapped_column(Integer, server_default="1")  # the online store sells this many units at a time (badges: 50)
 
 
