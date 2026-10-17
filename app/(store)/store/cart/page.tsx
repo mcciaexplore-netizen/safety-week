@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BranchSelect, ProductImage, QtyStepper, WeightLine } from "@/components/store/bits";
 import { useEffect, useState } from "react";
 import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
-import { cartLines, cartTotals, checkAvailability, gstPrice, rupees, setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
+import { cartLines, cartTotals, checkAvailability, gstPrice, packOf, rupees, setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
 
 export default function CartPage() {
   const { data, error, reload } = useCatalogue();
@@ -32,12 +32,12 @@ export default function CartPage() {
   }, [branch, cartKey]);
 
   /** Changing a quantity re-reads the live stock; the branch's real number is the limit. */
-  async function change(id: string, n: number, current: number) {
+  async function change(id: string, n: number, current: number, pack = 1) {
     if (n <= current) { storeActions.setQty(id, n); setNotes((x) => { const { [id]: _drop, ...rest } = x; void _drop; return rest; }); return; }
     if (!branch) { setNeedBranch(true); return; }
     setNeedBranch(false);
     try {
-      const r = await setQtyChecked(id, n, branch);
+      const r = await setQtyChecked(id, n, branch, pack);
       setNotes((x) => { const { [id]: _drop, ...rest } = x; void _drop; return r.info ? { ...rest, [id]: r.info } : rest; });
     } catch { /* offline: leave the cart as it is */ }
   }
@@ -69,10 +69,10 @@ export default function CartPage() {
               <div className="w-20 shrink-0"><ProductImage product={p} /></div>
               <div className="min-w-0 flex-1">
                 <Link href={`/store/p/${p.slug}`} className="font-heading font-bold hover:text-primary">{p.name}</Link>
-                <p className="text-sm">{rupees(p.rate)} <span className="text-xs text-muted-foreground">({rupees(gstPrice(p))} incl. GST)</span></p>
+                <p className="text-sm">{rupees(Number(p.rate) * packOf(p))}{packOf(p) > 1 && <span className="text-xs"> per pack of {packOf(p)}</span>} <span className="text-xs text-muted-foreground">({rupees(gstPrice(p) * packOf(p))} incl. GST)</span></p>
                 <WeightLine product={p} />
                 <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <QtyStepper value={qty} onChange={(n) => void change(p.id, n, qty)} label={`Quantity of ${p.name}`} />
+                  <QtyStepper value={qty} step={packOf(p)} onChange={(n) => void change(p.id, n, qty, packOf(p))} label={`Quantity of ${p.name}`} />
                   <button type="button" onClick={() => storeActions.setQty(p.id, 0)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-danger" aria-label={`Remove ${p.name}`}>
                     <Trash2 className="size-3.5" />Remove
                   </button>

@@ -140,7 +140,7 @@ def catalogue(s: Sess):
         out.append({
             "id": str(p.id), "slug": p.slug or str(p.id), "name": _clean(p.name), "category": p.category or "Safety Materials",
             "image_url": p.image_url, "best_seller": p.best_seller, "unit": p.unit, "hsn_code": p.hsn_code,
-            "weight_grams": p.weight_grams, "rate": str(p.current_rate), "gst_percent": str(p.cgst_rate + p.sgst_rate), "price_incl_gst": str(_price_incl_gst(p)),
+            "weight_grams": p.weight_grams, "pack_size": p.pack_size, "rate": str(p.current_rate), "gst_percent": str(p.cgst_rate + p.sgst_rate), "price_incl_gst": str(_price_incl_gst(p)),
             # None (stock not set up) counts as 0 for shoppers
             # what the shop shows: nothing when there is plenty, "Low stock" or "Out of stock" otherwise
             "stock_status": {code: ("OUT" if (st.get(p.id) or 0) <= 0 else lv[code][p.id].status) for code, st in stock.items()},
@@ -375,6 +375,10 @@ def place_order(body: OrderIn, s: Sess, authorization: Annotated[str | None, Hea
         pr = products.get(pid)
         if pr is None or not pr.active or not pr.online_enabled:
             raise HTTPException(422, "One of the products is no longer available")
+    for l in body.items:  # a bundle product (badges: 50) is only sold in whole packs
+        pr = products[l.product_id]
+        if l.quantity % pr.pack_size:
+            raise HTTPException(422, f"{_clean(pr.name)} is sold in packs of {pr.pack_size}. Please choose a whole number of packs.")
 
     cfg = delivery.read_config(s)
     quote = delivery.quote(cfg, products, [(l.product_id, l.quantity) for l in body.items]) if deliver else None

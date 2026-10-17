@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, ProductLink, StockNote, WeightLine } from "@/components/store/bits";
 import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
-import { setQtyChecked, storeActions, useCatalogue, useStore, type Availability, type Branch, type Product } from "@/lib/store/client";
+import { packOf, setQtyChecked, storeActions, useCatalogue, useStore, type Availability, type Branch, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 
@@ -96,11 +96,11 @@ function ProductCard({ p, branches, branch, inCart }: { p: Product; branches: Br
   const branchName = branches.find((b) => b.code === branch)?.name ?? "";
 
   /** Reads the branch's live stock from the database, then adds as many as it really has. */
-  async function add(code: string | null, extra = 1, base = inCart) {
+  async function add(code: string | null, extra = packOf(p), base = inCart) {
     if (!code) { setNeedBranch(true); return; }
     setNeedBranch(false);
     setBusy(true);
-    try { setInfo((await setQtyChecked(p.id, base + extra, code)).info); }
+    try { setInfo((await setQtyChecked(p.id, base + extra, code, packOf(p))).info); }
     catch { setInfo(null); }
     finally { setBusy(false); }
   }

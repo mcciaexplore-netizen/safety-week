@@ -57,6 +57,21 @@ def test_shoppers_see_each_products_packed_weight(client, people, prods, deliver
     assert 0 in shown.values()                                     # not set yet -> 0, the store shows no weight line
 
 
+def test_bundle_products_are_sold_in_whole_packs(client, people, prods):
+    with engine.begin() as c:
+        c.execute(text("update products set pack_size = 50 where name like :n"), {"n": f"{POSTER}%"})
+    try:
+        stock_for(client, people, prods, "TIL", POSTER, 200)
+        assert {p["name"]: p["pack_size"] for p in client.get(f"{S}/catalogue").json()["products"]}[POSTER] == 50
+        r = client.post(f"{S}/orders", json=order_body(prods, lines=((POSTER, 7),)))
+        assert r.status_code == 422 and "packs of 50" in r.text      # a loose quantity is refused by the server, not just the screen
+        r = client.post(f"{S}/orders", json=order_body(prods, lines=((POSTER, 100),)))
+        assert r.status_code in (200, 201) and "packs of" not in r.text   # two whole packs go through
+    finally:
+        with engine.begin() as c:
+            c.execute(text("update products set pack_size = 1"))
+
+
 def test_delivery_rules_are_enforced_by_the_server(client, people, prods, delivery_on):
     stock_for(client, people, prods, "TIL", POSTER, 10)
     no_address = {k: v for k, v in deliver_body(prods).items() if k != "ship_to"}

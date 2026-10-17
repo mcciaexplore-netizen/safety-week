@@ -128,6 +128,7 @@ class Product(Base):
         UniqueConstraint("event_id", "sku"),
         CheckConstraint("current_rate >= 0", name="ck_products_rate"),
         CheckConstraint("weight_grams >= 0", name="ck_products_weight"),
+        CheckConstraint("pack_size >= 1", name="ck_products_pack_size"),
         Index("uq_products_event_slug", "event_id", "slug", unique=True),
     )
     id: Mapped[uuid.UUID] = pk()
@@ -152,6 +153,7 @@ class Product(Base):
     online_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     best_seller: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     weight_grams: Mapped[int] = mapped_column(Integer, server_default="0")  # packed weight of ONE unit, for delivery charges
+    pack_size: Mapped[int] = mapped_column(Integer, server_default="1")  # the online store sells this many units at a time (badges: 50)
 
 
 class DiscountRule(Base):

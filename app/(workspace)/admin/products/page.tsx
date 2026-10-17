@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/format";
 import { ProductStockFlag, useStockAlerts } from "@/components/app/low-stock-alert";
 import { api } from "@/lib/services/api";
 
-interface Product { best_seller: boolean; id: string; sku: string; name: string; description: string; hsn_code: string; unit: string; current_rate: string; cgst_rate: string; sgst_rate: string; sr_no: number | null; line_order: number; active: boolean; rate_confirmed: boolean; category: string; image_url: string; online_enabled: boolean; weight_grams?: number }
+interface Product { best_seller: boolean; id: string; sku: string; name: string; description: string; hsn_code: string; unit: string; current_rate: string; cgst_rate: string; sgst_rate: string; sr_no: number | null; line_order: number; active: boolean; rate_confirmed: boolean; category: string; image_url: string; online_enabled: boolean; weight_grams?: number; pack_size?: number }
 
 const FIELDS: FieldSpec[] = [
   { key: "name", label: "Particulars (name on the invoice)", wide: true },
@@ -29,6 +29,7 @@ const FIELDS: FieldSpec[] = [
   { key: "category", label: "Online store category", hint: "Groups the product in the store, e.g. T-Shirts." },
   { key: "image_url", label: "Photo web address (https://…)", hint: "Shown in the online store. Leave blank for a placeholder.", wide: true },
   { key: "weight_grams", label: "Packed weight of one unit (grams)", type: "number", step: "1", hint: "Shown to shoppers in the store and used to work out the delivery charge. Leave 0 if it cannot be delivered." },
+  { key: "pack_size", label: "Sold in packs of (units)", type: "number", step: "1", hint: "1 = sold singly. Badges: 50, so 1 selected in the store means 50 units, priced for 50 and taken from stock as 50." },
   { key: "online_enabled", label: "Show in the online store", type: "checkbox" },
   { key: "best_seller", label: "Tag as a best seller in the store", type: "checkbox" },
   { key: "active", label: "Available on new invoices", type: "checkbox" },
@@ -69,7 +70,7 @@ export default function ProductsPage() {
             <tbody className="[&>tr]:border-t [&_td]:px-3 [&_td]:py-2">
               {shown.map((x) => (
                 <tr key={x.id} data-testid="product-row" className={x.active ? "" : "opacity-60"}>
-                  <td className="text-muted-foreground">{x.line_order}</td><td className="font-medium">{x.name.replace(/\s+/g, " ")}{!x.active && <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>}<ProductStockFlag alerts={(alerts.data?.items ?? []).filter((a) => a.product_id === x.id)} /></td>
+                  <td className="text-muted-foreground">{x.line_order}</td><td className="font-medium">{x.name.replace(/\s+/g, " ")}{!x.active && <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>}{(x.pack_size ?? 1) > 1 && <span className="ml-2 text-xs text-muted-foreground">(packs of {x.pack_size})</span>}<ProductStockFlag alerts={(alerts.data?.items ?? []).filter((a) => a.product_id === x.id)} /></td>
                   <td className="font-mono">{x.hsn_code}</td><td className="text-right tabular-nums">{formatMoney(Number(x.current_rate))}</td><td className="text-right">{Number(x.cgst_rate)}% + {Number(x.sgst_rate)}%</td>
                   <td className="text-right tabular-nums">{x.weight_grams ? `${x.weight_grams} g` : <span className="text-xs text-warning" title="No weight set: this product cannot be home-delivered">not set</span>}</td>
                   <td>{x.rate_confirmed ? <Badge variant="outline" className="bg-success/10 text-success-fg">Confirmed</Badge> : <Badge variant="outline" className="bg-warning/10 text-warning">2026 reference</Badge>}</td>
@@ -86,12 +87,12 @@ export default function ProductsPage() {
           key={p?.id ?? "new"}
           title={isNew ? "Add product" : "Edit product"}
           fields={isNew ? FIELDS.filter((f) => f.key !== "confirm_rate") : FIELDS}
-          initial={isNew ? { name: "", hsn_code: "", unit: "Nos.", current_rate: "", cgst_rate: "9", sgst_rate: "9", line_order: String((list.data?.length ?? 0) + 1), sr_no: "", description: "", category: "", image_url: "", weight_grams: "0", online_enabled: true, best_seller: false, active: true }
-            : { name: p!.name, hsn_code: p!.hsn_code, unit: p!.unit, current_rate: p!.current_rate, cgst_rate: p!.cgst_rate, sgst_rate: p!.sgst_rate, line_order: String(p!.line_order), sr_no: p!.sr_no ? String(p!.sr_no) : "", description: p!.description, category: p!.category, image_url: p!.image_url, weight_grams: String(p!.weight_grams ?? 0), online_enabled: p!.online_enabled, best_seller: p!.best_seller, active: p!.active, confirm_rate: false }}
+          initial={isNew ? { name: "", hsn_code: "", unit: "Nos.", current_rate: "", cgst_rate: "9", sgst_rate: "9", line_order: String((list.data?.length ?? 0) + 1), sr_no: "", description: "", category: "", image_url: "", weight_grams: "0", pack_size: "1", online_enabled: true, best_seller: false, active: true }
+            : { name: p!.name, hsn_code: p!.hsn_code, unit: p!.unit, current_rate: p!.current_rate, cgst_rate: p!.cgst_rate, sgst_rate: p!.sgst_rate, line_order: String(p!.line_order), sr_no: p!.sr_no ? String(p!.sr_no) : "", description: p!.description, category: p!.category, image_url: p!.image_url, weight_grams: String(p!.weight_grams ?? 0), pack_size: String(p!.pack_size ?? 1), online_enabled: p!.online_enabled, best_seller: p!.best_seller, active: p!.active, confirm_rate: false }}
           onSave={async (v) => {
             const body = { name: str(v.name), description: str(v.description), hsn_code: str(v.hsn_code), unit: str(v.unit) || "Nos.", current_rate: str(v.current_rate),
               cgst_rate: str(v.cgst_rate), sgst_rate: str(v.sgst_rate), line_order: Number(v.line_order), sr_no: orNull(v.sr_no) ? Number(v.sr_no) : null, active: !!v.active, confirm_rate: !!v.confirm_rate,
-              category: str(v.category), image_url: str(v.image_url), weight_grams: Math.max(0, Math.round(Number(v.weight_grams) || 0)), online_enabled: !!v.online_enabled, best_seller: !!v.best_seller };
+              category: str(v.category), image_url: str(v.image_url), weight_grams: Math.max(0, Math.round(Number(v.weight_grams) || 0)), pack_size: Math.max(1, Math.round(Number(v.pack_size) || 1)), online_enabled: !!v.online_enabled, best_seller: !!v.best_seller };
             await api(isNew ? "/admin/products" : `/admin/products/${p!.id}`, { method: isNew ? "POST" : "PUT", body: JSON.stringify(body) });
             list.reload();
           }}

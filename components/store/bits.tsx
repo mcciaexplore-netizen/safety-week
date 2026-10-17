@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BookOpen, Flag, Gift, Image as ImageIcon, Minus, Plus, ScrollText, Shield, Shirt, Star } from "lucide-react";
-import { formatWeight, gstPrice, rupees, type Branch, type OrderStatus, type Product } from "@/lib/store/client";
+import { formatWeight, gstPrice, packOf, rupees, type Branch, type OrderStatus, type Product } from "@/lib/store/client";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICON: Record<string, typeof Shield> = {
@@ -39,18 +39,20 @@ export function BestSellerTag({ className }: { className?: string }) {
 
 /** Price as asked: the shelf price first, the GST-inclusive price in small brackets underneath. */
 export function PriceBlock({ product, size = "md", className }: { product: Product; size?: "md" | "lg"; className?: string }) {
+  const n = packOf(product); // a bundle product shows the price of the whole pack, e.g. 50 badges
   return (
     <div className={className}>
-      <p className={cn("font-heading font-extrabold tracking-tight text-foreground", size === "lg" ? "text-4xl" : "text-xl")}>{rupees(product.rate)}</p>
-      <p className={cn("text-muted-foreground", size === "lg" ? "text-sm" : "text-xs")}>({rupees(gstPrice(product))} incl. GST)</p>
+      <p className={cn("font-heading font-extrabold tracking-tight text-foreground", size === "lg" ? "text-4xl" : "text-xl")}>{rupees(Number(product.rate) * n)}{n > 1 && <span className={cn("ml-1 font-sans font-semibold text-muted-foreground", size === "lg" ? "text-base" : "text-xs")}>for {n}</span>}</p>
+      <p className={cn("text-muted-foreground", size === "lg" ? "text-sm" : "text-xs")}>({rupees(gstPrice(product) * n)} incl. GST)</p>
     </div>
   );
 }
 
 /** Packed weight of one unit, so shoppers can see what a home delivery will weigh. Nothing is shown until the admin has set it. */
-export function WeightLine({ product, className }: { product: Pick<Product, "weight_grams" | "unit">; className?: string }) {
+export function WeightLine({ product, className }: { product: Pick<Product, "weight_grams" | "unit" | "pack_size">; className?: string }) {
   if (!product.weight_grams || product.weight_grams <= 0) return null;
-  return <p className={cn("text-xs text-muted-foreground", className)}>Weight: {formatWeight(product.weight_grams)} per {product.unit.replace(/\.$/, "").toLowerCase() === "nos" ? "piece" : product.unit}</p>;
+  const n = packOf(product);
+  return <p className={cn("text-xs text-muted-foreground", className)}>Weight: {formatWeight(product.weight_grams * n)} {n > 1 ? `per pack of ${n}` : `per ${product.unit.replace(/\.$/, "").toLowerCase() === "nos" ? "piece" : product.unit}`}</p>;
 }
 
 /** Availability at the shopper's chosen branch. */
@@ -61,20 +63,21 @@ export function StockLine({ qty, branchName }: { qty: number; branchName?: strin
   return <span className="text-xs font-semibold text-success-fg">In stock{branchName ? ` at ${branchName}` : ""}</span>;
 }
 
-export function QtyStepper({ value, onChange, max, label }: { value: number; onChange: (n: number) => void; max?: number; label: string }) {
+export function QtyStepper({ value, onChange, max, label, step = 1 }: { value: number; onChange: (n: number) => void; max?: number; label: string; step?: number }) {
   return (
     <div className="inline-flex items-center rounded-lg border bg-white" role="group" aria-label={label}>
       <button type="button" aria-label={`Decrease ${label}`} className="grid size-9 place-items-center text-muted-foreground hover:text-primary disabled:opacity-40"
-        onClick={() => onChange(value - 1)} disabled={value <= 0}><Minus className="size-4" /></button>
+        onClick={() => onChange(Math.max(0, value - step))} disabled={value <= 0}><Minus className="size-4" /></button>
       <input
         aria-label={label}
         inputMode="numeric"
-        className="h-9 w-12 border-x bg-transparent text-center text-sm font-semibold outline-none"
+        className="h-9 w-14 border-x bg-transparent text-center text-sm font-semibold outline-none"
         value={value}
+        readOnly={step > 1} // packs: only the + and - buttons change it, so it is always whole packs
         onChange={(e) => onChange(Math.max(0, Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.floor(Number(e.target.value.replace(/\D/g, "")) || 0))))}
       />
       <button type="button" aria-label={`Increase ${label}`} className="grid size-9 place-items-center text-muted-foreground hover:text-primary disabled:opacity-40"
-        onClick={() => onChange(value + 1)} disabled={max !== undefined && value >= max}><Plus className="size-4" /></button>
+        onClick={() => onChange(value + step)} disabled={max !== undefined && value + step > max}><Plus className="size-4" /></button>
     </div>
   );
 }

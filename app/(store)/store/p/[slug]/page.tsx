@@ -8,18 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BestSellerTag, BranchSelect, PriceBlock, ProductImage, QtyStepper, StockNote, WeightLine } from "@/components/store/bits";
 import { AvailabilityNotice, ChooseBranchFirst } from "@/components/store/availability";
-import { setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
+import { packOf, setQtyChecked, storeActions, useCatalogue, useStore, type Availability } from "@/lib/store/client";
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const { data, error, reload } = useCatalogue();
   const { branch, cart } = useStore();
-  const [qty, setQty] = useState(1);
+  const [packs, setPacks] = useState(1);
   const [added, setAdded] = useState(false);
   const [info, setInfo] = useState<Availability | null>(null);
   const [needBranch, setNeedBranch] = useState(false);
   const [busy, setBusy] = useState(false);
   const p = data?.products.find((x) => x.slug === slug);
+  const step = p ? packOf(p) : 1;
+  const qty = packs * step; // a bundle product (badges: 50) is chosen in whole packs, so 1 pack = 50 selected
 
   /** Live stock for the chosen branch decides how many can be added. */
   async function addToCart(code: string | null, quantity: number) {
@@ -28,7 +30,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     setNeedBranch(false);
     setBusy(true);
     try {
-      const r = await setQtyChecked(p.id, (cart[p.id] ?? 0) + quantity, code);
+      const r = await setQtyChecked(p.id, (cart[p.id] ?? 0) + quantity, code, step);
       setInfo(r.info);
       if (r.qty > 0) { setAdded(true); setTimeout(() => setAdded(false), 2000); }
     } catch { setInfo(null); } finally { setBusy(false); }
@@ -63,7 +65,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             {needBranch && <ChooseBranchFirst branches={data.branches} onPick={(c) => { storeActions.setBranch(c); void addToCart(c, qty); }} />}
             {info && <AvailabilityNotice info={info} branchName={data.branches.find((b) => b.code === branch)?.name ?? ""} onSwitch={(c) => { storeActions.setBranch(c); setInfo(null); void addToCart(c, Math.max(1, info.wanted - (cart[p.id] ?? 0))); }} />}
             <div className="flex flex-wrap items-center gap-3 pt-1">
-              <QtyStepper value={qty} onChange={(n) => setQty(Math.max(1, n))} label="Quantity" />
+              <QtyStepper value={qty} step={step} onChange={(n) => setPacks(Math.max(1, Math.round(n / step)))} label="Quantity" />
               <Button size="lg" disabled={busy} onClick={() => void addToCart(branch, qty)}>
                 {added ? <Check data-icon="inline-start" /> : <ShoppingCart data-icon="inline-start" />}{added ? "Added" : "Add to cart"}
               </Button>

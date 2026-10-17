@@ -287,6 +287,7 @@ class ProductAdminOut(Strict):
     online_enabled: bool = True
     best_seller: bool = False
     weight_grams: int = 0
+    pack_size: int = 1
 
 
 class ProductIn(Strict):
@@ -306,6 +307,7 @@ class ProductIn(Strict):
     online_enabled: bool | None = None  # shown in the online store (left as it is when not sent)
     best_seller: bool | None = None  # tagged "Best seller" in the online store (left as it is when not sent)
     weight_grams: int | None = Field(default=None, ge=0, le=1_000_000)  # packed weight of one unit, for delivery charges (left as it is when not sent)
+    pack_size: int | None = Field(default=None, ge=1, le=100_000)  # units the online store sells together, e.g. 50 for badges (left as it is when not sent)
 
 
 class ConfirmIn(Strict):
@@ -331,6 +333,7 @@ def create_product(data: ProductIn, s: Sess, event_id: uuid.UUID | None = None):
     fields["online_enabled"] = True if fields["online_enabled"] is None else fields["online_enabled"]
     fields["best_seller"] = bool(fields["best_seller"])
     fields["weight_grams"] = fields["weight_grams"] or 0
+    fields["pack_size"] = fields["pack_size"] or 1
     p = Product(id=uuid.uuid4(), event_id=e.id, sku=f"{e.invoice_prefix}-{uuid.uuid4().hex[:6].upper()}",
                 slug=f"{slugify(data.name)}-{uuid.uuid4().hex[:4]}", rate_confirmed=True, **fields)  # a product an admin just typed in is deliberate
     s.add(p)
@@ -343,7 +346,7 @@ def edit_product(product_id: uuid.UUID, data: ProductIn, s: Sess):
     p = s.get(Product, product_id) or _404("product")
     rate_changed = data.current_rate != p.current_rate
     for k, v in data.model_dump(exclude={"confirm_rate"}).items():
-        if k in ("online_enabled", "best_seller", "weight_grams") and v is None:
+        if k in ("online_enabled", "best_seller", "weight_grams", "pack_size") and v is None:
             continue  # not sent: keep what is there
         setattr(p, k, v)
     if rate_changed or data.confirm_rate:
