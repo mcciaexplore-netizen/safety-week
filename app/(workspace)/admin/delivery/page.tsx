@@ -15,6 +15,20 @@ interface Config {
   extra_per_kg: string | number; gst_percent: string | number; sac_code: string; delivery_days: string; max_weight_grams: number; tracking_url_template: string;
 }
 
+// Starting values for a typical India-wide courier rate card. They are estimates, not DTDC's own prices: check them against your rate card.
+const SUGGESTED = {
+  packing_grams: 200, max_weight_grams: 20000, extra_per_kg: "50", gst_percent: "18", sac_code: "996812", delivery_days: "3-5 working days",
+  slabs: [{ up_to_grams: 500, charge: "70" }, { up_to_grams: 1000, charge: "110" }, { up_to_grams: 2000, charge: "170" }, { up_to_grams: 5000, charge: "300" }],
+};
+
+function priceFor(c: Config, grams: number) {
+  const slabs = c.slabs.map((s) => ({ g: Number(s.up_to_grams), c: Number(s.charge) })).filter((s) => s.g > 0 && Number.isFinite(s.c)).sort((a, b) => a.g - b.g);
+  if (!slabs.length) return null;
+  const hit = slabs.find((s) => grams <= s.g);
+  const last = slabs[slabs.length - 1];
+  return hit ? hit.c : last.c + Number(c.extra_per_kg || 0) * Math.ceil((grams - last.g) / 1000);
+}
+
 export default function DeliverySettingsPage() {
   const cfg = useAsync(() => api<Config>("/admin/delivery-settings"), "admin-delivery");
   return (
@@ -26,7 +40,9 @@ export default function DeliverySettingsPage() {
 }
 
 function Form({ initial, onSaved }: { initial: Config; onSaved: () => void }) {
-  const [c, setC] = useState<Config>({ ...initial, slabs: initial.slabs.map((s) => ({ ...s })) });
+  const fresh = initial.slabs.length === 0;  // nothing saved yet: start from the suggested values (shown, not saved until "Save")
+  const [c, setC] = useState<Config>(fresh ? { ...initial, ...SUGGESTED, enabled: true, slabs: SUGGESTED.slabs.map((x) => ({ ...x })) } : { ...initial, slabs: initial.slabs.map((x) => ({ ...x })) });
+  const [testKg, setTestKg] = useState("0.75");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const set = <K extends keyof Config>(k: K, v: Config[K]) => setC((p) => ({ ...p, [k]: v }));
@@ -54,15 +70,24 @@ function Form({ initial, onSaved }: { initial: Config; onSaved: () => void }) {
     <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{el}{hint && <p className="text-xs text-muted-foreground">{hint}</p>}</div>
   );
 
+  const testGrams = Math.round((Number(testKg) || 0) * 1000);
+  const testBase = priceFor(c, 1);
+
   return (
     <div className="space-y-6">
+      {fresh && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm" role="status">
+          <p className="font-semibold">We have filled in typical starting values for you.</p>
+          <p className="mt-1 text-muted-foreground">These are estimates, not DTDC&apos;s own prices. Change the rupee amounts if your DTDC rate card is different, then press <b>Save</b>. Nothing is live until you save.</p>
+        </div>
+      )}
       <section className="glass space-y-4 rounded-xl p-6 shadow-card">
         <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-4" checked={c.enabled} onChange={(e) => set("enabled", e.target.checked)} data-testid="delivery-enabled" />Offer home delivery in the online store</label>
         <div className="grid gap-4 sm:grid-cols-2">
           {field("courier", "Courier", <Input id="courier" value={c.courier} onChange={(e) => set("courier", e.target.value)} />)}
           {field("days", "Delivery time shown to customers", <Input id="days" value={c.delivery_days} onChange={(e) => set("delivery_days", e.target.value)} />, "e.g. 2-3 working days")}
-          {field("packing", "Packing weight added to every parcel (grams)", <Input id="packing" type="number" min={0} value={c.packing_grams} onChange={(e) => set("packing_grams", Number(e.target.value))} />, "Box, tape and bubble wrap.")}
-          {field("max", "Heaviest parcel allowed (grams, 0 = no limit)", <Input id="max" type="number" min={0} value={c.max_weight_grams} onChange={(e) => set("max_weight_grams", Number(e.target.value))} />)}
+          {field("packing", "Packing weight added to every parcel (grams)", <Input id="packing" type="number" min={0} value={c.packing_grams} onChange={(e) => set("packing_grams", Number(e.target.value))} />, "The weight of the box, tape and bubble wrap. We add it to the products' weight. 200 is a good guess.")}
+          {field("max", "Heaviest parcel allowed (grams, 0 = no limit)", <Input id="max" type="number" min={0} value={c.max_weight_grams} onChange={(e) => set("max_weight_grams", Number(e.target.value))} />, "Orders heavier than this cannot use home delivery. 20000 = 20 kg.")}
         </div>
       </section>
 
@@ -79,12 +104,27 @@ function Form({ initial, onSaved }: { initial: Config; onSaved: () => void }) {
               <Button type="button" variant="outline" size="sm" aria-label="Remove this row" onClick={() => setC((p) => ({ ...p, slabs: p.slabs.filter((_, j) => j !== i) }))}><Trash2 className="size-4" /></Button>
             </div>
           ))}
-          <Button type="button" variant="outline" size="sm" onClick={() => setC((p) => ({ ...p, slabs: [...p.slabs, { up_to_grams: "" as unknown as number, charge: "" }] }))}><Plus data-icon="inline-start" />Add a row</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setC((p) => ({ ...p, slabs: [...p.slabs, { up_to_grams: "" as unknown as number, charge: "" }] }))}><Plus data-icon="inline-start" />Add a row</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setC((p) => ({ ...p, ...SUGGESTED, slabs: SUGGESTED.slabs.map((x) => ({ ...x })) }))}>Fill in typical rates</Button>
+          </div>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-4 text-sm" data-testid="price-check">
+          <p className="font-semibold">Check a price</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span>A parcel of</span>
+            <Input aria-label="Parcel weight in kg" type="number" min={0} step="0.1" className="w-24" value={testKg} onChange={(e) => setTestKg(e.target.value)} />
+            <span>kg (plus {c.packing_grams || 0} g packing) costs the customer:</span>
+          </div>
+          <p className="mt-2">{testBase === null ? "Add at least one row above to see a price." : testGrams <= 0 ? "Type a weight above." : (() => {
+            const b = priceFor(c, testGrams + Number(c.packing_grams || 0)) ?? 0; const g = b * Number(c.gst_percent || 0) / 100;
+            return <>₹{b.toFixed(2)} + ₹{g.toFixed(2)} GST = <b>₹{(b + g).toFixed(2)}</b></>;
+          })()}</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          {field("extra", "Extra per started kg above the last row (₹)", <Input id="extra" type="number" min={0} step="0.01" value={c.extra_per_kg} onChange={(e) => set("extra_per_kg", e.target.value)} />)}
-          {field("gst", "GST on delivery (%)", <Input id="gst" type="number" min={0} max={28} step="0.01" value={c.gst_percent} onChange={(e) => set("gst_percent", e.target.value)} />, "Added on top and shown on the invoice as CGST + SGST.")}
-          {field("sac", "SAC code on the invoice", <Input id="sac" value={c.sac_code} onChange={(e) => set("sac_code", e.target.value)} />, "996812 = courier services.")}
+          {field("extra", "Extra for each kg above the last row (₹)", <Input id="extra" type="number" min={0} step="0.01" value={c.extra_per_kg} onChange={(e) => set("extra_per_kg", e.target.value)} />, "Only used for parcels heavier than your last row. Every started kg counts.")}
+          {field("gst", "GST on delivery (%)", <Input id="gst" type="number" min={0} max={28} step="0.01" value={c.gst_percent} onChange={(e) => set("gst_percent", e.target.value)} />, "Added on top of the charge. 18 is the normal rate for courier services.")}
+          {field("sac", "SAC code on the invoice", <Input id="sac" value={c.sac_code} onChange={(e) => set("sac_code", e.target.value)} />, "Tax code for courier services. Leave it as it is.")}
         </div>
       </section>
 
